@@ -1,0 +1,12 @@
+# Datafiles
+*.npy
+*.xlsx
+*.pt
+*.pdf
+
+# Folders
+RESULTS_FOLDER/
+DATA/
+eval/
+paths/
+
