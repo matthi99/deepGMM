@@ -18,6 +18,7 @@ import argparse
 import json
 import numpy as np
 
+#test
 
 #Define parameters for training 
 parser = argparse.ArgumentParser(description='Define hyperparameters for training.')
