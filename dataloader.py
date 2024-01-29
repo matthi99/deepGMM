@@ -27,13 +27,14 @@ class CardioDataset(torch.utils.data.Dataset):
     This dataset loads an image and applies some transformations to it.
     """
 
-    def __init__(self, folder="DATA/traindata/", validation=False, test=False, **kwargs):
+    def __init__(self, folder="DATA/preprocessed/traindata2d/", validation=False, test=False, **kwargs):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.folder = folder
         self.validation = validation
         self.test = test
         self.patients = kwargs.get("patients")
         self.name = kwargs.get("name", "Case")
+        self.modalities= kwargs.get("modalities", ["LGE", "T2", "C0"])
         
         if self.patients is None:
             if validation:
@@ -45,42 +46,28 @@ class CardioDataset(torch.utils.data.Dataset):
 
         self.patients = [f"{self.name}_{format(num, '03d')}" for num in self.patients]
         self.examples = self.get_examples()
-        self.transforms = self.prepare_transforms(**kwargs)
+        self.spatial_transforms, self.intensity_transforms = self.prepare_transforms(**kwargs)
 
     def __getitem__(self, idx):
         example=self.examples[idx]
         z = np.load(os.path.join(self.folder, self.examples[idx]), allow_pickle=True).item()
         
         mask = np.moveaxis(z["masks"], -1, 0)
-        inp = z["img"]
+        inp = {}
+        for modality in self.modalities:
+            inp[modality]= z[modality]
         center=z['center']
         
-        if len(inp.shape) == 3:
-            if not self.test and not self.validation:
-                z_coord=inp.shape[0]
-                
-                if z_coord>=7:
-                    #get random patch
-                    r=np.random.randint(0,z_coord-6,1)[0]
-                    inp=inp[r:r+7,...]
-                    mask=mask[:,r:r+7,...]
-                
-                else:
-                    #nearest neighbour interpolation
-                    temp_inp= np.zeros((7,inp.shape[1], inp.shape[2]))
-                    temp_mask= np.zeros((5,7,inp.shape[1], inp.shape[2]))
-                    for i in range(7):
-                        temp_inp[i,...]= inp[int((z_coord/7)*i),...]
-                        temp_mask[:,i,...] = mask[:,int((z_coord/7)*i), ...]
-                    inp=temp_inp
-                    mask= temp_mask
-        
-        for transform in self.transforms:
+        for transform in self.spatial_transforms:
             inp, mask = transform(inp, mask, center)
             
+        for transform in self.intensity_transforms:
+            for modality in self.modalities:
+                inp[modality], mask = transform(inp[modality], mask, center)
                 
-
-        inp = torch.from_numpy(inp[None, ...].astype("float32")).to(self.device)
+            
+        inp= np.stack([inp[modality] for modality in self.modalities],0)        
+        inp = torch.from_numpy(inp.astype("float32")).to(self.device)
         mask = torch.from_numpy(mask).to(self.device)
         return inp, mask, example
 
@@ -100,34 +87,32 @@ class CardioDataset(torch.utils.data.Dataset):
 
     
     def prepare_transforms(self,**kwargs):
-        transforms = []
-        if kwargs.get("ellastic"): 
-            transforms.append(Ellastic())
+        spacial_transforms = []
+        intensity_transforms = []
         if kwargs.get("spatialtransform") is not None:
-            transforms.append(SpatialTransform(**kwargs.get("spatialtransform")))
-        if kwargs.get("motion"):  
-            transforms.append(RandomMotion())
+            spacial_transforms.append(SpatialTransform(self.modalities, **kwargs.get("spatialtransform")))
         if kwargs.get("ROI") is not None:
-            transforms.append(getRoi(**kwargs.get("ROI")))
-        if kwargs.get("normalize") is not None:
-            transforms.append(Normalize(**kwargs.get("normalize")))
-        if kwargs.get("gaussian") is not None:
-            transforms.append(Gaussian_noise(**kwargs.get("gaussian")))
-        if kwargs.get("gaussianblur") is not None:
-            transforms.append(GaussianBlur(**kwargs.get("gaussianblur")))    
-        if kwargs.get("brighness") is not None:
-            transforms.append(Brightness(**kwargs.get("brightness")))
-        if kwargs.get("contrast") is not None:
-            transforms.append(Contrast(**kwargs.get("contrast")))  
-        if kwargs.get("lowres") is not None:
-            transforms.append(LowResolution(**kwargs.get("lowres")))   
-        if kwargs.get("ghosting"):
-            transforms.append(RandomGhosting())       
-        if kwargs.get("gamma") is not None:  
-            transforms.append(GammaTransform())
+            spacial_transforms.append(getRoi(self.modalities,**kwargs.get("ROI")))
         if kwargs.get("flip"):
-            transforms.append(RandomFlip())
-        return transforms
+            spacial_transforms.append(RandomFlip(self.modalities))
+        if kwargs.get("normalize") is not None:
+            intensity_transforms.append(Normalize(**kwargs.get("normalize")))
+        if kwargs.get("gaussian") is not None:
+            intensity_transforms.append(Gaussian_noise(**kwargs.get("gaussian")))
+        if kwargs.get("gaussianblur") is not None:
+            intensity_transforms.append(GaussianBlur(**kwargs.get("gaussianblur")))    
+        if kwargs.get("brighness") is not None:
+            intensity_transforms.append(Brightness(**kwargs.get("brightness")))
+        if kwargs.get("contrast") is not None:
+            intensity_transforms.append(Contrast(**kwargs.get("contrast")))  
+        if kwargs.get("lowres") is not None:
+            intensity_transforms.append(LowResolution(**kwargs.get("lowres")))   
+        if kwargs.get("ghosting"):
+            intensity_transforms.append(RandomGhosting())       
+        if kwargs.get("gamma") is not None:  
+            intensity_transforms.append(GammaTransform())
+        
+        return spacial_transforms, intensity_transforms
 
 
 
@@ -139,7 +124,7 @@ class CardioCollatorMulticlass:
     This collator returns batches of (images, dictionaries) where the dictionary contains masks for all the classes.
     """
 
-    def __init__(self, classes=("bg", "blood", "muscle", "scar", "mvo"), classes_data =("bg", "blood", "muscle", "scar", "mvo"), **kwargs):
+    def __init__(self, classes=("bg", "blood", "muscle", "edema", "scar"), classes_data =("bg", "blood", "muscle", "edema", "scar"), **kwargs):
         self.classes = classes
         self.kwargs = kwargs
         self.return_all = kwargs.get("return_all", False)
@@ -175,21 +160,24 @@ class CardioCollatorMulticlass:
         
         
 class getRoi(object):
-    def __init__(self, **kwargs):
-        self.width=48
-        self.height=48
+    def __init__(self, modalities, **kwargs):
+        self.width=kwargs.get("width", 48)
+        self.height=kwargs.get("height", 48)
         self.t=kwargs.get("translation", 0)
+        self.modalities = modalities
     
     def __call__(self, img, mask, center):
         tx=np.random.randint(-self.t, self.t+1)
         ty=np.random.randint(-self.t, self.t+1)
         cx=center[0]+tx
         cy=center[1]+ty
-        if len(img.shape) ==3:
-            img=img[:,cx-self.width:cx+self.width,cy-self.height:cy+self.height]
+        if len(img[self.modalities[0]].shape) ==3:
+            for modality in self.modalities:
+                img[modality]=img[modality][:,cx-self.width:cx+self.width,cy-self.height:cy+self.height]
             mask=mask[:,:,cx-self.width:cx+self.width,cy-self.height:cy+self.height]
         else:
-            img=img[cx-self.width:cx+self.width,cy-self.height:cy+self.height]
+            for modality in self.modalities:
+                img[modality]=img[modality][cx-self.width:cx+self.width,cy-self.height:cy+self.height]
             mask=mask[:,cx-self.width:cx+self.width,cy-self.height:cy+self.height]
         return img, mask
         
@@ -219,9 +207,10 @@ class Normalize(object):
 
 
 class RandomFlip(object):
-    def __init__(self, p=None, methods=None):
+    def __init__(self, modalities, p=None, methods=None):
         self.p = p
         self.methods = methods
+        self.modalities = modalities
         if self.methods is None:
             self.methods = [Image.FLIP_LEFT_RIGHT,
                             Image.FLIP_TOP_BOTTOM]
@@ -231,13 +220,14 @@ class RandomFlip(object):
     def __call__(self, img, mask, center):
         if np.random.uniform(0, 1) <= self.p:
             method = np.random.choice(self.methods)
-            if len(img.shape) == 3:
+            if len(img[self.modalities[0]].shape) == 3:
                 for i in range(img.shape[0]):
                     img[i,...] = np.asarray(Image.fromarray(img[i,...]).transpose(method=method))
                     for j in range(mask.shape[0]):
                         mask[j,i, ...] = np.asarray(Image.fromarray(mask[j,i, ...]).transpose(method=method))
             else:
-                img = np.asarray(Image.fromarray(img).transpose(method=method))
+                for modality in self.modalities:
+                    img[modality] = np.asarray(Image.fromarray(img[modality]).transpose(method=method))
                 for j in range(mask.shape[0]):
                     mask[j,...] = np.asarray(Image.fromarray(mask[j,...]).transpose(method=method))
         
@@ -257,39 +247,6 @@ class Gaussian_noise(object):
             return img+noise, mask
         else:
             return img, mask
-
-class Ellastic(object):
-    def __init__(self, p=0.5):
-        self.p=p
-    def __call__(self, img, mask, center):
-        if len(img.shape) == 3:
-            if np.random.uniform(0, 1) <= self.p:
-                subject = tio.Subject(image = tio.ScalarImage(tensor =np.expand_dims(img,0)),
-                                      mask = tio.LabelMap(tensor = mask))
-                transform=tio.RandomElasticDeformation(num_control_points=(5, 7, 7),max_displacement=(0,14,14))
-                deformed=transform(subject)
-                #transform(np.expand_dims(img,0))
-                #stacked=np.concatenate((np.expand_dims(img,0),mask),0)
-                #deformed= transform(stacked)
-                return np.array(deformed.image)[0,...], np.array(deformed.mask)
-            else:
-                return img, mask
-        else:
-            if np.random.uniform(0, 1) <= self.p:
-                #img=np.stack([img for i in range(5)])
-                #mask=np.stack([mask for i in range(5)],1)
-                img=np.expand_dims(img,0)
-                mask=np.expand_dims(mask,1)
-                subject = tio.Subject(image = tio.ScalarImage(tensor =np.expand_dims(img,0)),
-                                      mask = tio.LabelMap(tensor = mask))
-                transform=tio.RandomElasticDeformation(num_control_points=(5, 7, 7),max_displacement=(0,8,8))
-                deformed=transform(subject)
-                #transform(np.expand_dims(img,0))
-                #stacked=np.concatenate((np.expand_dims(img,0),mask),0)
-                #deformed= transform(stacked)
-                return np.array(deformed.image)[0,0,...], np.array(deformed.mask)[:,0,...]
-            else:
-                return img, mask
 
 
 class GammaTransform(object):
@@ -487,7 +444,7 @@ class SpatialTransform(object):
 
 
     """
-    def __init__(self, border_mode_data='nearest', border_cval_data=0, order_data=3,
+    def __init__(self, modalities,  border_mode_data='nearest', border_cval_data=0, order_data=3,
                   border_mode_seg='constant', border_cval_seg=0, order_seg=0, **kwargs):
         self.do_elastic_deform= kwargs.get("do_elastic_deform", True)
         self.alpha = kwargs.get("alpha", (0., 900.))
@@ -505,11 +462,13 @@ class SpatialTransform(object):
         self.border_mode_seg = border_mode_seg
         self.border_cval_seg = border_cval_seg
         self.order_seg = order_seg
+        self.modalities = modalities
         
         
 
     def __call__(self, img, mask, center):
-        coords = create_zero_centered_coordinate_mesh(img.shape)
+
+        coords = create_zero_centered_coordinate_mesh(img[self.modalities[0]].shape)
         modified_coords = False
         
         if self.do_elastic_deform and np.random.uniform() < self.p_el_per_sample:
@@ -521,7 +480,7 @@ class SpatialTransform(object):
         if self.do_rotation and np.random.uniform() < self.p_rot_per_sample:
             
             angle = np.random.uniform(self.angles[0], self.angles[1])
-            if len(img.shape)==3:
+            if len(img[self.modalities[0]].shape)==3:
                 rot_matrix = np.array([[1, 0, 0],
                            [0, np.cos(angle), -np.sin(angle)],
                            [0, np.sin(angle), np.cos(angle)]])
@@ -538,7 +497,7 @@ class SpatialTransform(object):
                 sc = np.random.uniform(self.scale[0], 1)
             else:
                 sc = np.random.uniform(max(self.scale[0], 1), self.scale[1])
-            if len(img.shape)==3:
+            if len(img[self.modalities[0]].shape)==3:
                 coords[1:] *= sc
             else:
                 coords*=sc
@@ -546,10 +505,11 @@ class SpatialTransform(object):
         
         if modified_coords:
             
-            for i in range(len(img.shape)):
-                coords[i]+=img.shape[i]//2
+            for i in range(len(img[self.modalities[0]].shape)):
+                coords[i]+=img[self.modalities[0]].shape[i]//2
             
-            img = map_coordinates(img.astype(float), coords, order=self.order_data, mode= self.border_mode_data, cval=self.border_cval_data)
+            for modality in self.modalities:
+                img[modality] = map_coordinates(img[modality].astype(float), coords, order=self.order_data, mode= self.border_mode_data, cval=self.border_cval_data)
             temp=np.argmax(mask,0)
             temp=map_coordinates(temp.astype(float), coords, order = self.order_seg, mode=self.border_mode_seg, cval=self.border_cval_seg)
             mask=(np.stack([temp==i for i in range(5)],0)*1).astype(np.float64)
@@ -564,58 +524,65 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
     from torch.utils.data import DataLoader
     # p = 'images/dataset/'
-    classes=["bloodpool", "healthy muscle", "scar", "mvo"]
+    classes=["bloodpool", "healthy muscle", "edema", "scar", "mvo"]
 
     # if not os.path.exists(p):
     #     os.mkdir(p)
     
     
-    setup=Config.train_data_setup_3d
-    #setup=Config.val_data_setup
+    setup=Config.train_data_setup
+    
+    cd = CardioDataset( **setup)
 
-    cd = CardioDataset(folder="C:/Users/A0067501/Desktop/emidec/create_data/traindata/", z_dim=True, **setup)
 
-
-    collator = CardioCollatorMulticlass(classes=( "bg", "blood", "muscle", "scar", "mvo"), **{'return_all': True})
+    collator = CardioCollatorMulticlass(**{'return_all': True})
     dataset = DataLoader(cd,  batch_size=1, collate_fn=collator, shuffle=False)
     
     l=1
     k=0
     for img ,mask, example in dataset:
-        if len(img.shape)==5:
-            img=img[0,...]
-            for key in mask.keys():
-                mask[key]=mask[key][0,...]
-        for i in range(img.shape[1]):
-            im=img[0,i, ...].cpu().detach().numpy()
-            blood=mask["blood"][0,i, ...].cpu().detach().numpy()
-            muscle=(mask["muscle"][0,i, ...]).cpu().detach().numpy()
-            scar=mask["scar"][0,i, ...].cpu().detach().numpy()
-            mvo=mask["mvo"][0,i, ...].cpu().detach().numpy()
+        
+        im_LGE=img[0,0, ...].cpu().detach().numpy()
+        im_T2=img[0,1, ...].cpu().detach().numpy()
+        im_C0=img[0,2, ...].cpu().detach().numpy()
+        blood=mask["blood"][0,0, ...].cpu().detach().numpy()
+        muscle=(mask["muscle"][0,0, ...]).cpu().detach().numpy()
+        edema=mask["edema"][0,0, ...].cpu().detach().numpy()
+        scar=mask["scar"][0,0, ...].cpu().detach().numpy()
             
-            seg=blood+2*muscle+3*scar+4*mvo
-            seg=seg-1
-            seg = np.ma.masked_where(seg == -1, seg)
+        seg=blood+2*muscle+3*edema+4*scar
+        seg=seg-1
+        seg = np.ma.masked_where(seg == -1, seg)
                 
                 
-            plt.figure()
-            plt.subplot(1,2,1)
-            plt.imshow(im, cmap='gray')
-            plt.gca().set_title(example[0][0:-4]+"_"+str(i))
-            plt.axis('off')
-            plt.subplot(1,2,2)
-            plt.imshow(im, cmap='gray')
-            mat=plt.imshow(seg, 'jet', alpha=0.5, interpolation="none", vmin = 0, vmax = 3)
-            plt.axis('off')
-            plt.gca().set_title('Labels')
+        plt.figure()
+        plt.subplot(2,2,1)
+        plt.imshow(im_LGE, cmap='gray')
+        plt.gca().set_title("LGE"+example[0])
+        plt.axis('off')
+        plt.subplot(2,2,2)
+        plt.imshow(im_T2, cmap='gray')
+        plt.gca().set_title("T2")
+        plt.axis('off')
+        plt.subplot(2,2,3)
+        plt.imshow(im_C0, cmap='gray')
+        plt.gca().set_title("C0")
+        plt.axis('off')
+        plt.subplot(2,2,4)
+        plt.imshow(im_LGE, cmap='gray')
+        plt.gca().set_title("Lables")
+        plt.axis('off')
+        mat=plt.imshow(seg, 'jet', alpha=0.5, interpolation="none", vmin = 0, vmax = 3)
+        plt.axis('off')
+        plt.gca().set_title('Labels')
                 
-            values = np.array([0,1,2,3])
-            colors = [ mat.cmap(mat.norm(value)) for value in values]
-            patches = [ mpatches.Patch(color=colors[i], label="{l}".format(l=classes[i]) ) for i in range(len(values)) ]
-            plt.legend(handles=patches, loc='lower right',  bbox_to_anchor=(0.85, -0.4, 0.2, 0.2) )
+        values = np.array([0,1,2,3])
+        colors = [ mat.cmap(mat.norm(value)) for value in values]
+        patches = [ mpatches.Patch(color=colors[i], label="{l}".format(l=classes[i]) ) for i in range(len(values)) ]
+        plt.legend(handles=patches, loc='lower right',  bbox_to_anchor=(0.85, -0.4, 0.2, 0.2) )
                 
             #plt.savefig("C:/Users/A0067501/Desktop/Project3D/create_dataset/check_labels/val/"+example[0][0:-4]+"_"+str(i)+".png", bbox_inches='tight', dpi=500)
-            plt.show()
+        plt.show()
         
             # if np.max(mask[cls].cpu().detach().numpy())>1:
             #     print('Problem')
@@ -632,6 +599,6 @@ if __name__ == '__main__':
             #plt.savefig(p+cls +'/image-'+str(l)+'.png', bbox_inches='tight')
             
             #plt.close()
-            l=l+1
+        l=l+1
             
 
