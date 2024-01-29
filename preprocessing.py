@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import cv2
+from scipy import ndimage
 
 data_folder = "DATA"
 
@@ -64,7 +65,12 @@ for gt, im_LGE, im_T2, im_C0 in zip(files_gt, files_LGE, files_T2, files_C0):
     edema[temp==1220]=1
     scar=np.zeros(temp.shape)
     scar[temp==2221]=1
-        
+    
+    middle= bg[bg.shape[0]//2,...]
+    middle= 1-middle
+    center=ndimage.measurements.center_of_mass(middle)
+    data['center']=(int(center[0]), int(center[1]))
+
     masks=np.concatenate((bg[...,None], blood[...,None], muscle[...,None], edema[...,None], scar[...,None]), axis=3)
     data['masks']=masks
     

@@ -469,6 +469,13 @@ class SpatialTransform(object):
     def __call__(self, img, mask, center):
 
         coords = create_zero_centered_coordinate_mesh(img[self.modalities[0]].shape)
+        
+        if len(img[self.modalities[0]].shape)==3:
+            coords[1]+=(img[self.modalities[0]].shape[1]//2-center[0])
+            coords[2]+=(img[self.modalities[0]].shape[2]//2-center[1])
+        else:
+            coords[0]+=(img[self.modalities[0]].shape[0]//2-center[0])
+            coords[1]+=(img[self.modalities[0]].shape[1]//2-center[1])
         modified_coords = False
         
         if self.do_elastic_deform and np.random.uniform() < self.p_el_per_sample:
@@ -504,9 +511,19 @@ class SpatialTransform(object):
             modified_coords = True
         
         if modified_coords:
+            #reverse previous translation
+            if len(img[self.modalities[0]].shape)==3:
+                coords[0]+=2
+                coords[1]+=center[0]
+                coords[2]+=center[1]
+                
+            else:
+                coords[0]+=center[0]
+                coords[1]+=center[1]
+
             
-            for i in range(len(img[self.modalities[0]].shape)):
-                coords[i]+=img[self.modalities[0]].shape[i]//2
+            # for i in range(len(img[self.modalities[0]].shape)):
+            #     coords[i]+=img[self.modalities[0]].shape[i]//2
             
             for modality in self.modalities:
                 img[modality] = map_coordinates(img[modality].astype(float), coords, order=self.order_data, mode= self.border_mode_data, cval=self.border_cval_data)

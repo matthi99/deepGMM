@@ -39,8 +39,8 @@ class Config:
             "mode": "mean"
             },
         "ROI": {
-            "width": 192,
-            "height": 192,
+            "width": 80,
+            "height": 80,
             "translation": 4
             },
         "gamma": {
@@ -73,8 +73,8 @@ class Config:
             "mode": "mean"
             },
         "ROI": {
-            "width": 192,
-            "height": 192,
+            "width": 80,
+            "height": 80,
             "translation": 0
             },
     }  

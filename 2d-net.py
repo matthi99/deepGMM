@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 """
 Created on Wed Jan 25 09:22:44 2023
@@ -26,12 +27,12 @@ parser.add_argument('--epochs', type=int, default=100)
 parser.add_argument('--batchsize', type=int, default=8)
 parser.add_argument('--batchnorm', type=bool, default=True)
 parser.add_argument('--start_filters', type=int, default=32)
-parser.add_argument('--out_channels', type=int, default=5)
+parser.add_argument('--out_channels', type=int, default=6)
 parser.add_argument('--activation', type=str, default="leakyrelu")
 parser.add_argument('--dropout', type=float, default=0.05)
 parser.add_argument('--fold', type=int, default=0)
 parser.add_argument('--datafolder', help= "Path to 2d data folder", type=str, 
-                    default="DATA/traindata2d/")
+                    default="DATA/preprocessed/traindata2d/")
 parser.add_argument('--savepath', help= "Path were resuts should get saved", type=str, 
                     default="RESULTS_FOLDER/")
 parser.add_argument('--savefolder', type=str, default="2d-net_")
@@ -62,8 +63,8 @@ config = {
         "dropout": args.dropout,
         "batchnorm": args.batchnorm,
         "start_filters": args.start_filters,
-        "in_channels":1,
-        "L":3,
+        "in_channels":3,
+        "L":4,
         "out_channels": args.out_channels,
         "residual": False, 
         "last_activation":"softmax"},
@@ -72,7 +73,7 @@ config = {
     "best_metric":-float('inf'),
     "fold":args.fold
 }
-setup_train=Config.val_data_setup
+setup_train=Config.train_data_setup
 setup_val=Config.val_data_setup
 if args.fold<5:
     logger.info(f"Training on fold {args.fold} of nnunet data split")
@@ -84,10 +85,10 @@ else:
    
 
 #get dataloaders     
-cd_train = CardioDataset(folder=args.datafolder ,z_dim=False,  **setup_val)
+cd_train = CardioDataset(folder=args.datafolder ,z_dim=False,  **setup_train)
 #for evaluation we read in the whole stack per patient so it has to be batch_size=1 
 cd_val = CardioDataset(folder=args.datafolder ,z_dim=False, validation=True, **setup_val)    
-collator = CardioCollatorMulticlass(classes=("bg", "blood","muscle", "scar", "mvo"))
+collator = CardioCollatorMulticlass(classes=("bg", "blood","muscle", "edema", "scar"))
 dataloader_train = torch.utils.data.DataLoader(cd_train, batch_size=args.batchsize, collate_fn=collator,
                                                         shuffle=True)    
 dataloader_eval = torch.utils.data.DataLoader(cd_val, batch_size=args.batchsize, collate_fn=collator,
@@ -102,7 +103,7 @@ opt = torch.optim.SGD(net.parameters(), 5*1e-3, weight_decay=1e-3,
 lambda1 = lambda epoch: (1-epoch/args.epochs)**0.9
 scheduler = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda=lambda1)
     
-likely_loss = get_loss(crit="likely_heart") 
+likely_loss = get_loss(crit="likely") 
 dice_loss = get_loss(crit= "dice")
 metrics={metric: get_metric(metric=metric) for metric in config['metrics']} 
 classes=config["classes"]
@@ -123,16 +124,15 @@ for epoch in range(args.epochs):
         gt= torch.cat([mask[key].float() for key in mask.keys()],1)
         out=net(im)[0]
         out_heart= 1-out[:,0:1,...]
-        #out_heart= out_heart[:,None,...]
         loss += dice_loss(out_heart, (1-mask["bg"]).float())
         print("dice", loss)
-        loss += 0.3*likely_loss(out, im, (1-mask["bg"]).float())
+        loss += likely_loss(out, im, (1-mask["bg"]).float())
         print("likely_heart" , likely_loss(out, im, (1-mask["bg"]).float()))
         loss.backward()
         torch.nn.utils.clip_grad_norm_(net.parameters(), 12)
         opt.step()
         histogram.add_loss(loss)
-        histogram.add_train_metrics(out,gt)
+        #histogram.add_train_metrics(out,gt)
         steps += 1
     
     histogram.scale_train(steps)
@@ -146,8 +146,9 @@ for epoch in range(args.epochs):
     for im,mask in dataloader_eval:
         with torch.no_grad():
             gt= torch.cat([mask[key].float() for key in mask.keys()],1)
-            out=net(im)[0]
-            histogram.add_val_metrics(out,gt)
+            out=net(im)[0][0:-1]
+            
+            #histogram.add_val_metrics(out,gt)
             steps += 1
     
     histogram.scale_val(steps)

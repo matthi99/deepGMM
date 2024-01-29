@@ -15,26 +15,58 @@ class Likelyloss(torch.nn.Module):
         super(Likelyloss, self).__init__()
     def forward(self, predictions, inputs, heart):
         (B,K,X,Y)=predictions.shape
-        mu=torch.zeros((B,K))
-        var=torch.zeros((B,K))
-        alpha=torch.zeros((B,K))
-        N=torch.sum(heart[:,0,...],axis=[1,2])
-        eps=torch.finfo(torch.float32).eps
-        for b in range(B):
-            for k in range(1,K):
-                alpha[b,k]=(torch.sum(predictions[b,k,...]))/N[b]
-                mu[b,k]=torch.sum(predictions[b,k,...]*inputs[b,0,...])/(torch.sum(predictions[b,k,...])+eps)
-                var[b,k]=(torch.sum(predictions[b,k,...]*(inputs[b,0,...]-mu[b,k])**2)/(torch.sum(predictions[b,k,...])+eps))+eps
-                
-        temp=torch.zeros_like(predictions)
-        for b in range(B):
-            for k in range(1,K):
-                temp[b,k,...]=alpha[b,k]*(1/(torch.sqrt(2*torch.pi*var[b,k])))*torch.exp(-((inputs[b,0,...]-mu[b,k])**2/(2*var[b,k])))
+        K=5
+        M=inputs.shape[1]
+        eps=1e-10
         likelylosses=torch.zeros(B)
         for b in range(B):
-            likelylosses[b]=-torch.mean(torch.log(torch.sum(temp[b,...],axis=0)+eps))
+            l_blood=predictions[b,1,...][heart[b,0,...]==1]
+            l_muscle=predictions[b,2,...][heart[b,0,...]==1]
+            l_edema=predictions[b,3,...][heart[b,0,...]==1]
+            l_scar=predictions[b,4,...][heart[b,0,...]==1]
+            l_mvo=predictions[b,5,...][heart[b,0,...]==1]
+            in_LGE =inputs[b,0,...][heart[b,0,...]==1]
+            in_T2 = inputs[b,1,...][heart[b,0,...]==1]
+            in_C0 = inputs[b,2,...][heart[b,0,...]==1]
+            
+            inp= torch.stack((in_LGE, in_T2, in_C0))
+            pred=torch.stack((l_blood, l_muscle, l_edema, l_scar, l_mvo))
+            
+            
+            mu=torch.zeros((K,M))
+            var=torch.zeros((K,M))
+            for k in range(K):
+                for m in range(M):
+                    mu[k,m]=torch.sum(pred[k,...]*inp[m,...])/(torch.sum(pred[k,...])+eps)
+                    var[k,m]=(torch.sum(pred[k,...]*(inp[m,...]-mu[k,m])**2)/(torch.sum(pred[k,...])+eps))+eps
+                    
+            temp=torch.zeros((K,M,len(in_LGE)))
+            
+            for k in range(1,K):
+                for m in range(M):
+                    temp[k,m,...]=pred[k]*(1/(torch.sqrt(2*torch.pi*var[k,m])))*torch.exp(-((inp[m,...]-mu[k,m])**2/(2*var[k,m])))
+            
+            
+            likelylosses[b]=-torch.mean(torch.log(torch.sum(torch.prod(temp,1),axis=0)+eps))
+        
         likelyloss=torch.mean(likelylosses)
+        #print(likelyloss)
+        N=B*X*Y
+        probs = (torch.sum(predictions,axis=[0,2,3])/N)
+        a=probs[0]
+        probs=probs[1:]*(1/(1-a))
+        #print(probs)
+        probs_gt= torch.zeros_like(probs)
+        probs_gt[0]=0.5
+        probs_gt[1]=0.3
+        probs_gt[2]=0.1
+        probs_gt[3]=0.08
+        probs_gt[4]=0.02
+        #print(probs_gt)
+        likelyloss = likelyloss + torch.mean((probs-probs_gt)**2)
+        
         return likelyloss
+
 
 class Likelyloss_heart(torch.nn.Module):
     def __init__(self, **kwargs):
