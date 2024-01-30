@@ -24,10 +24,10 @@ import numpy as np
 #Define parameters for training 
 parser = argparse.ArgumentParser(description='Define hyperparameters for training.')
 parser.add_argument('--epochs', type=int, default=100)
-parser.add_argument('--batchsize', type=int, default=8)
+parser.add_argument('--batchsize', type=int, default=4)
 parser.add_argument('--batchnorm', type=bool, default=True)
 parser.add_argument('--start_filters', type=int, default=32)
-parser.add_argument('--out_channels', type=int, default=6)
+parser.add_argument('--out_channels', type=int, default=5)
 parser.add_argument('--activation', type=str, default="leakyrelu")
 parser.add_argument('--dropout', type=float, default=0.05)
 parser.add_argument('--fold', type=int, default=0)
@@ -69,7 +69,7 @@ config = {
         "residual": False, 
         "last_activation":"softmax"},
     
-    "classes": ["blood","muscle", "scar", "mvo"],
+    "classes": ["blood","muscle", "edema", "scar"],
     "best_metric":-float('inf'),
     "fold":args.fold
 }
@@ -125,14 +125,14 @@ for epoch in range(args.epochs):
         out=net(im)[0]
         out_heart= 1-out[:,0:1,...]
         loss += dice_loss(out_heart, (1-mask["bg"]).float())
-        print("dice", loss)
-        loss += likely_loss(out, im, (1-mask["bg"]).float())
-        print("likely_heart" , likely_loss(out, im, (1-mask["bg"]).float()))
+        #print("dice", loss)
+        loss += likely_loss(out, im, (1-mask["bg"]).float(), gt)
+        #print("likely_heart" , likely_loss(out, im, (1-mask["bg"]).float()))
         loss.backward()
         torch.nn.utils.clip_grad_norm_(net.parameters(), 12)
         opt.step()
         histogram.add_loss(loss)
-        #histogram.add_train_metrics(out,gt)
+        histogram.add_train_metrics(out,gt)
         steps += 1
     
     histogram.scale_train(steps)
@@ -146,9 +146,9 @@ for epoch in range(args.epochs):
     for im,mask in dataloader_eval:
         with torch.no_grad():
             gt= torch.cat([mask[key].float() for key in mask.keys()],1)
-            out=net(im)[0][0:-1]
+            out=net(im)[0]
             
-            #histogram.add_val_metrics(out,gt)
+            histogram.add_val_metrics(out,gt)
             steps += 1
     
     histogram.scale_val(steps)
@@ -159,7 +159,7 @@ for epoch in range(args.epochs):
     
     #ceck for improvement and save best model
     val_metric=0
-    for cl in ["scar", "mvo"]:
+    for cl in ["blood","muscle", "edema",  "scar"]:
         val_metric+=histogram.hist[config['metrics'][0]][f"val_{cl}"][-1]
     val_metric=val_metric/2
     if val_metric > best_metric:

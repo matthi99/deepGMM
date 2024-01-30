@@ -67,7 +67,18 @@ class Config:
         "flip":True, 
         }
     
+    train_data_setup_no_aug = {
+        "normalize": {
+            "mode": "mean"
+            },
+        "ROI": {
+            "width": 80,
+            "height": 80,
+            "translation": 0
+            }
+        }
     
+        
     val_data_setup = {
         "normalize": {
             "mode": "mean"

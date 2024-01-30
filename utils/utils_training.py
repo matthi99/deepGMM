@@ -53,7 +53,7 @@ class Histogram():
         #make output binary
         with torch.no_grad():
             temp=torch.argmax(out,1).long()
-            temp=torch.nn.functional.one_hot(temp,5)
+            temp=torch.nn.functional.one_hot(temp,len(self.classes)+1)
             out=torch.moveaxis(temp, -1, 1)
         for m in self.metrics:
             with torch.no_grad():
@@ -69,7 +69,7 @@ class Histogram():
         #make output binary
         with torch.no_grad():
             temp=torch.argmax(out,1).long()
-            temp=torch.nn.functional.one_hot(temp,5)
+            temp=torch.nn.functional.one_hot(temp,len(self.classes)+1)
             out=torch.moveaxis(temp, -1, 1)
         for m in self.metrics:
             with torch.no_grad():
@@ -117,7 +117,7 @@ class Histogram():
         plt.figure()
         plt.plot(np.array(self.hist["loss"]))
         plt.title("Loss")
-        plt.savefig(savefolder+f"Loss.png", dpi=300, bbox_inches="tight", pad_inches=0.1)
+        plt.savefig(os.path.join(savefolder,"Loss.png"), dpi=300, bbox_inches="tight", pad_inches=0.1)
         plt.close()
         for m in self.metrics:
             # plot mean metric
@@ -125,16 +125,16 @@ class Histogram():
             plt.plot(np.array(self.hist[m]["train_mean"]))
             plt.plot(np.array(self.hist[m]["val_mean"]))
             plt.title(f"Mean {m}")
-            plt.savefig(savefolder+f"Mean {m}.png", dpi=300, bbox_inches="tight", pad_inches=0.1)
+            plt.savefig(os.path.join(savefolder,f"Mean {m}.png"), dpi=300, bbox_inches="tight", pad_inches=0.1)
             plt.close()
             #plot metric for different classes
             for cl in self.classes:
                 plt.figure()
                 plt.plot(np.array(self.hist[m][f"train_{cl}"]))
                 plt.plot(np.array(self.hist[m][f"val_{cl}"]))
-                plt.savefig(savefolder+f"{m} {cl}.png", dpi=300, bbox_inches="tight", pad_inches=0.1)
+                plt.savefig(os.path.join(savefolder,f"{m} {cl}.png"), dpi=300, bbox_inches="tight", pad_inches=0.1)
                 plt.close()
-            
+
                 
             
        
