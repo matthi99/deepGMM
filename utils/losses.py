@@ -19,6 +19,8 @@ class Likelyloss(torch.nn.Module):
         M=inputs.shape[1]
         eps=1e-10
         likelylosses=torch.zeros(B)
+        mu_mean=torch.zeros((K,M))
+        sigma_mean=torch.zeros((K,M))
         for b in range(B):
             l_blood=predictions[b,1,...][heart[b,0,...]==1]
             l_muscle=predictions[b,2,...][heart[b,0,...]==1]
@@ -33,23 +35,25 @@ class Likelyloss(torch.nn.Module):
             pred_lge=torch.stack((l_blood, l_muscle + l_edema, l_muscle + l_edema, l_scar))
             pred_t2=torch.stack((l_blood, l_muscle, l_edema+l_scar, l_edema+l_scar))
             pred_c0=torch.stack((l_blood, l_muscle + l_edema + l_scar, 
-                                 l_muscle + l_edema + l_scar, l_muscle + l_edema + l_scar))
+                                  l_muscle + l_edema + l_scar, l_muscle + l_edema + l_scar))
+            
+            
+            
             pred=torch.stack((l_blood, l_muscle, l_edema, l_scar))
-            pred_mu=torch.stack((pred_lge, pred_t2, pred_c0),1)
+            #pred_mu=torch.stack((pred_lge, pred_t2, pred_c0),1)
+            pred_mu=torch.stack((pred, pred, pred),1)
             
-            pred_gt= torch.stack((gt[b,1,...][heart[b,0,...]==1], gt[b,2,...][heart[b,0,...]==1], 
-                                  gt[b,3,...][heart[b,0,...]==1], gt[b,4,...][heart[b,0,...]==1]))
-            
-            
-            mu_gt=torch.zeros((K,M))
-            var_gt=torch.zeros((K,M))
-            
-            for k in range(K):
-                for m in range(M):
-                    mu_gt[k,m]=torch.sum(pred_gt[k]*inp[m])/(torch.sum(pred_gt[k])+eps)
-                    var_gt[k,m]=(torch.sum(pred_gt[k]*(inp[m,...]-mu_gt[k,m])**2)/(torch.sum(pred_gt[k])+eps))+eps
+            # pred_gt= torch.stack((gt[b,1,...][heart[b,0,...]==1], gt[b,2,...][heart[b,0,...]==1], 
+            #                       gt[b,3,...][heart[b,0,...]==1], gt[b,4,...][heart[b,0,...]==1]))
             
             
+            # mu_gt=torch.zeros((K,M))
+            # var_gt=torch.zeros((K,M))
+            
+            # for k in range(K):
+            #     for m in range(M):
+            #         mu_gt[k,m]=torch.sum(pred_gt[k]*inp[m])/(torch.sum(pred_gt[k])+eps)
+            #         var_gt[k,m]=(torch.sum(pred_gt[k]*(inp[m,...]-mu_gt[k,m])**2)/(torch.sum(pred_gt[k])+eps))+eps
             
             mu=torch.zeros((K,M))
             var=torch.zeros((K,M))
@@ -58,7 +62,9 @@ class Likelyloss(torch.nn.Module):
                 for m in range(M):
                     mu[k,m]=torch.sum(pred_mu[k,m,...]*inp[m,...])/(torch.sum(pred_mu[k,m,...])+eps)
                     var[k,m]=(torch.sum(pred_mu[k,m,...]*(inp[m,...]-mu[k,m])**2)/(torch.sum(pred_mu[k,m,...])+eps))+eps
-                    
+             
+            mu_mean+=mu    
+            sigma_mean+=torch.sqrt(var)
             #print(mu)        
             temp=torch.zeros((K,M,len(in_LGE)))
             
@@ -69,21 +75,33 @@ class Likelyloss(torch.nn.Module):
             
             likelylosses[b]=-torch.mean(torch.log(torch.sum(torch.prod(temp,1),axis=0)+eps))
             #print(mu_gt)
-            mu_gt= torch.tensor([[ 0.7711, -0.3106,  1.1920],
-                                  [-0.7858,  0.7168, -0.5759],
-                                  [-0.6861,  1.5934, -0.2782],
-                                  [ 0.4515,  1.6370,  0.1207]])
-            likelylosses[b]=+torch.mean((mu_gt-mu)**2)
+            
+            
         likelyloss=torch.mean(likelylosses)
         
-        N=B*X*Y
-        probs = (torch.sum(predictions,axis=[0,2,3])/N)
-        a=probs[0]
-        probs=probs[1:]*(1/(1-a))
-        #print(probs)
-        probs_gt= (1/4)*torch.ones_like(probs)
-        #print(probs_gt)
-        likelyloss = likelyloss + torch.sum((probs-probs_gt)**2)
+        mu_mean =mu_mean/B
+        sigma_mean = sigma_mean/B
+        mu_gt= torch.tensor([[ 1.13263178, -0.13630785,  1.6058956 ],
+                             [-0.41842756,  0.51262672, -0.00925156],
+                             [ 0.29902016,  1.25442789,  0.52296464],
+                             [ 1.15254939,  1.04698159,  0.3860968 ]])
+        
+        sigma_gt= torch.tensor([[0.67609396, 0.61812245, 0.59229357],
+                                [0.57415889, 0.41136607, 0.46106531],
+                                [0.71600954, 0.45154963, 0.58179293],
+                                [0.80249576, 0.5147093,  0.50932555]])
+        
+        likelyloss+=torch.mean((mu_gt-mu_mean)**2)
+        likelyloss+=torch.mean((sigma_gt-sigma_mean)**2)
+        
+        # N=B*X*Y
+        # probs = (torch.sum(predictions,axis=[0,2,3])/N)
+        # a=probs[0]
+        # probs=probs[1:]*(1/(1-a))
+        # #print(probs.sum())
+        # probs_gt= (1/4)*torch.ones_like(probs)
+        # #print(probs_gt)
+        # likelyloss = likelyloss + torch.sum((probs-probs_gt)**2)
         
         return likelyloss
 

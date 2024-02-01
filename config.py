@@ -68,6 +68,10 @@ class Config:
         }
     
     train_data_setup_no_aug = {
+        "spatialtransform":{
+            "do_elastic_deform":True, 
+            "alpha":(0.,175.),
+            },
         "normalize": {
             "mode": "mean"
             },
@@ -75,7 +79,11 @@ class Config:
             "width": 80,
             "height": 80,
             "translation": 0
-            }
+            }, 
+        "gaussian":{
+            "sigma":0.1, 
+            "p_gaussian":0.15},
+        "flip":True, 
         }
     
         

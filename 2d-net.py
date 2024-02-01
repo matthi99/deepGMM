@@ -23,7 +23,7 @@ import numpy as np
 
 #Define parameters for training 
 parser = argparse.ArgumentParser(description='Define hyperparameters for training.')
-parser.add_argument('--epochs', type=int, default=100)
+parser.add_argument('--epochs', type=int, default=750)
 parser.add_argument('--batchsize', type=int, default=4)
 parser.add_argument('--batchnorm', type=bool, default=True)
 parser.add_argument('--start_filters', type=int, default=32)
@@ -73,7 +73,7 @@ config = {
     "best_metric":-float('inf'),
     "fold":args.fold
 }
-setup_train=Config.train_data_setup
+setup_train=Config.train_data_setup_no_aug
 setup_val=Config.val_data_setup
 if args.fold<5:
     logger.info(f"Training on fold {args.fold} of nnunet data split")
