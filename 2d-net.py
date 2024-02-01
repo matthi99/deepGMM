@@ -24,7 +24,7 @@ import numpy as np
 #Define parameters for training 
 parser = argparse.ArgumentParser(description='Define hyperparameters for training.')
 parser.add_argument('--epochs', type=int, default=750)
-parser.add_argument('--batchsize', type=int, default=4)
+parser.add_argument('--batchsize', type=int, default=16)
 parser.add_argument('--batchnorm', type=bool, default=True)
 parser.add_argument('--start_filters', type=int, default=32)
 parser.add_argument('--out_channels', type=int, default=5)
@@ -106,6 +106,7 @@ scheduler = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda=lambda1)
     
 likely_loss = get_loss(crit="likely") 
 dice_loss = get_loss(crit= "dice")
+mu_sigma = get_loss(crit= "mu_sigma")
 metrics={metric: get_metric(metric=metric) for metric in config['metrics']} 
 classes=config["classes"]
 histogram=Histogram(classes, metrics)
@@ -127,8 +128,10 @@ for epoch in range(args.epochs):
         out_heart= 1-out[:,0:1,...]
         loss += dice_loss(out_heart, (1-mask["bg"]).float())
         #print("dice", loss)
-        loss += likely_loss(out, im, (1-mask["bg"]).float(), gt)
+        loss += likely_loss(out, im, (1-mask["bg"]).float())
         #print("likely_heart" , likely_loss(out, im, (1-mask["bg"]).float()))
+        loss += 2*mu_sigma(out, im, (1-mask["bg"]).float())
+        #print("mu_sigma" , mu_sigma(out, im, (1-mask["bg"]).float()))
         loss.backward()
         torch.nn.utils.clip_grad_norm_(net.parameters(), 12)
         opt.step()
