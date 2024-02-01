@@ -98,8 +98,9 @@ dataloader_eval = torch.utils.data.DataLoader(cd_val, batch_size=args.batchsize,
 
 #get network, optimizer, loss, metric and histogramm    
 net=get_network(architecture="unet2d", **config["network"]).to(device)
-opt = torch.optim.SGD(net.parameters(), 5*1e-3, weight_decay=1e-3,
-                                         momentum=0.99, nesterov=True)   
+# opt = torch.optim.SGD(net.parameters(), 5*1e-3, weight_decay=1e-3,
+#                                          momentum=0.99, nesterov=True)   
+opt = torch.optim.AdamW(net.parameters(), weight_decay=1e-3,lr=5*1e-4)
 lambda1 = lambda epoch: (1-epoch/args.epochs)**0.9
 scheduler = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda=lambda1)
     
