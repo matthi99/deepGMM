@@ -82,6 +82,28 @@ def order (pred, gt, means, gt_means):
         ordered[pred == i]=cl
     return ordered
 
+def dicecoeff(pred, gt):
+    eps=1 
+    intersection = (pred * gt).sum()
+    total = (pred + gt).sum()
+    coeff = (2 * intersection + eps) / (total + eps)
+    return coeff
+
+
+def order_dice(pred, gt):
+    ordered= np.zeros_like(pred)
+    for i in np.unique(pred)[1:]:
+        pred_class = (pred==i)*1
+        dice = np.zeros(4)
+        for j in range(1,5):
+            dice[j-1]= dicecoeff(pred_class, (gt==j)*1)
+        gt_class = np.argmax(dice)+1
+        ordered[pred_class==1]=gt_class
+    return ordered
+    
+            
+    
+
 #%%
 #Prepare files
 
@@ -119,18 +141,18 @@ for test in files:
                          [ 1.15254939,  1.04698159,  0.3860968 ]])
     
     
-    gmm = GMM(n_components=4, covariance_type="diag", means_init= means_init, max_iter=2)
+    gmm = GMM(n_components=4, covariance_type="diag")
     gmm.fit(in_gmm)
     labels = gmm.predict(in_gmm)
     pred = np.zeros_like(mask_heart)
     pred[mask_heart==1]=labels+1
     
                 
-    # gmm_means = mean(X, pred)
-    # gt_means = mean(X, gt)
-    # means = np.zeros((5,3))
-    # means[1:,:]= means_init
-    # pred = order(pred, gt,  gmm_means, means)
+    gmm_means = mean(X, pred)
+    gt_means = mean(X, gt)
+    means = np.zeros((5,3))
+    means[1:,:]= means_init
+    pred = order_dice(pred, gt)
     
     plt.figure()
     plt.subplot(1,3,1)

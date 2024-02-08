@@ -30,12 +30,12 @@ parser.add_argument('--start_filters', type=int, default=32)
 parser.add_argument('--out_channels', type=int, default=5)
 parser.add_argument('--activation', type=str, default="leakyrelu")
 parser.add_argument('--dropout', type=float, default=0.1)
-parser.add_argument('--fold', type=int, default=3)
+parser.add_argument('--fold', type=int, default=0)
 parser.add_argument('--datafolder', help= "Path to 2d data folder", type=str, 
                     default="DATA/preprocessed/traindata2d/")
 parser.add_argument('--savepath', help= "Path were resuts should get saved", type=str, 
                     default="RESULTS_FOLDER/")
-parser.add_argument('--savefolder', type=str, default="2d-net_test_with_mu")
+parser.add_argument('--savefolder', type=str, default="2d-net_test_with_probs")
 args = parser.parse_args()
 
 
@@ -135,7 +135,7 @@ for epoch in range(args.epochs):
         mu = mu_sigma(out, im, (1-mask["bg"]).float())
         #print("mu_sigma" , mu_sigma(out, im, (1-mask["bg"]).float()))
         pr = probs(out, (1-mask["bg"]).float())
-        loss += likely + mu
+        loss += likely + pr
         loss.backward()
         torch.nn.utils.clip_grad_norm_(net.parameters(), 12)
         opt.step()
