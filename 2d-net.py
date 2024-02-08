@@ -24,18 +24,18 @@ import numpy as np
 #Define parameters for training 
 parser = argparse.ArgumentParser(description='Define hyperparameters for training.')
 parser.add_argument('--epochs', type=int, default=750)
-parser.add_argument('--batchsize', type=int, default=16)
+parser.add_argument('--batchsize', type=int, default=4)
 parser.add_argument('--batchnorm', type=bool, default=True)
 parser.add_argument('--start_filters', type=int, default=32)
 parser.add_argument('--out_channels', type=int, default=5)
 parser.add_argument('--activation', type=str, default="leakyrelu")
-parser.add_argument('--dropout', type=float, default=0.05)
-parser.add_argument('--fold', type=int, default=0)
+parser.add_argument('--dropout', type=float, default=0.1)
+parser.add_argument('--fold', type=int, default=3)
 parser.add_argument('--datafolder', help= "Path to 2d data folder", type=str, 
                     default="DATA/preprocessed/traindata2d/")
 parser.add_argument('--savepath', help= "Path were resuts should get saved", type=str, 
                     default="RESULTS_FOLDER/")
-parser.add_argument('--savefolder', type=str, default="2d-net_")
+parser.add_argument('--savefolder', type=str, default="2d-net_test_with_mu")
 args = parser.parse_args()
 
 
@@ -99,17 +99,19 @@ dataloader_eval = torch.utils.data.DataLoader(cd_val, batch_size=args.batchsize,
 #get network, optimizer, loss, metric and histogramm    
 net=get_network(architecture="unet2d", **config["network"]).to(device)
 # opt = torch.optim.SGD(net.parameters(), 5*1e-3, weight_decay=1e-3,
-#                                          momentum=0.99, nesterov=True)   
-opt = torch.optim.AdamW(net.parameters(), weight_decay=1e-3,lr=5*1e-4)
+#                                           momentum=0.99, nesterov=True)   
+opt = torch.optim.AdamW(net.parameters(), weight_decay=1e-3,lr=1e-3)
 lambda1 = lambda epoch: (1-epoch/args.epochs)**0.9
 scheduler = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda=lambda1)
     
 likely_loss = get_loss(crit="likely") 
 dice_loss = get_loss(crit= "dice")
 mu_sigma = get_loss(crit= "mu_sigma")
+probs= get_loss(crit= 'probs')
 metrics={metric: get_metric(metric=metric) for metric in config['metrics']} 
 classes=config["classes"]
-histogram=Histogram(classes, metrics)
+losses= ["likely", "mu", "dice"]
+histogram=Histogram(classes, metrics, losses)
 
     
 
@@ -126,16 +128,23 @@ for epoch in range(args.epochs):
         gt= torch.cat([mask[key].float() for key in mask.keys()],1)
         out=net(im)[0]
         out_heart= 1-out[:,0:1,...]
-        loss += dice_loss(out_heart, (1-mask["bg"]).float())
+        dice = dice_loss(out_heart, (1-mask["bg"]).float())
         #print("dice", loss)
-        loss += likely_loss(out, im, (1-mask["bg"]).float())
+        likely = likely_loss(out, im, (1-mask["bg"]).float())/10
         #print("likely_heart" , likely_loss(out, im, (1-mask["bg"]).float()))
-        loss += 2*mu_sigma(out, im, (1-mask["bg"]).float())
+        mu = mu_sigma(out, im, (1-mask["bg"]).float())
         #print("mu_sigma" , mu_sigma(out, im, (1-mask["bg"]).float()))
+        pr = probs(out, (1-mask["bg"]).float())
+        loss += likely + mu
         loss.backward()
         torch.nn.utils.clip_grad_norm_(net.parameters(), 12)
         opt.step()
-        histogram.add_loss(loss)
+        histogram.add_loss("likely", likely)
+        histogram.add_loss("mu", mu)
+        histogram.add_loss("dice", dice)
+        out[:,0:1,:,:][mask["bg"].float()==1]=1
+        for i in range(1,5):
+            out[:,i:i+1,:,:][mask["bg"].float()==1]=0
         histogram.add_train_metrics(out,gt)
         steps += 1
     
@@ -151,7 +160,9 @@ for epoch in range(args.epochs):
         with torch.no_grad():
             gt= torch.cat([mask[key].float() for key in mask.keys()],1)
             out=net(im)[0]
-            
+            out[:,0:1,:,:][mask["bg"].float()==1]=1
+            for i in range(1,5):
+                out[:,i:i+1,:,:][mask["bg"].float()==1]=0
             histogram.add_val_metrics(out,gt)
             steps += 1
     
@@ -171,8 +182,9 @@ for epoch in range(args.epochs):
         config["best_metric"]=best_metric
         logger.info(f"New best Metric {best_metric}")
         histogram.print_hist(logger)
-        save_checkpoint(net, os.path.join(path, savefolder), args.fold, "best_weights",  savepath=True)
-        json.dump(config, open(os.path.join(path,savefolder,"config-best_weights.json"), "w"))
+        save_checkpoint(net, os.path.join(path, savefolder), args.fold, f"weights_{epoch}",  savepath=True)
+        json.dump(config, open(os.path.join(path,savefolder,"config.json"), "w"))
+    
         
     logger.info(scheduler.get_last_lr())
     scheduler.step()

@@ -20,14 +20,18 @@ from skimage import measure
 
 
 class Histogram():
-    def __init__(self, classes, metrics):
+    def __init__(self, classes, metrics, losses):
         self.classes = classes
         self.metrics = metrics
+        self.losses = losses
         self.hist = self.prepare_hist()
+        
         
     def prepare_hist(self):
         hist={}
-        hist['loss'] = []
+        hist['losses'] = {}
+        for l in self.losses:
+            hist['losses'][l] = []
         for m in self.metrics:
             hist[m]={}
             hist[m]["train_mean"] = [] 
@@ -38,7 +42,8 @@ class Histogram():
         return hist
     
     def append_hist(self):
-        self.hist['loss'].append(0)
+        for l in self.losses:
+            self.hist['losses'][l].append(0)
         for m in self.metrics:
             self.hist[m]["train_mean"].append(0)
             self.hist[m]["val_mean"].append(0)
@@ -46,8 +51,8 @@ class Histogram():
                 self.hist[m][f"train_{cl}"].append(0) 
                 self.hist[m][f"val_{cl}"].append(0)
         
-    def add_loss(self, loss):
-        self.hist['loss'][-1]+=loss.item()
+    def add_loss(self, loss, value ):
+        self.hist['losses'][loss][-1]+=value.item()
     
     def add_train_metrics(self, out, gt):
         #make output binary
@@ -82,7 +87,8 @@ class Histogram():
                 self.hist[m]["val_mean"][-1]+=values.mean()
                 
     def scale_train(self,steps):
-        self.hist["loss"][-1]/=steps
+        for l in self.losses:
+            self.hist["losses"][l][-1]/=steps
         for m in self.metrics:
             self.hist[m]["train_mean"][-1]/=steps
             for cl in self.classes:
@@ -96,8 +102,9 @@ class Histogram():
     
     def print_hist(self,logger):
         logger.info("Training:")
-        loss=self.hist["loss"][-1]
-        logger.info(f"Loss = {loss}")
+        for l in self.losses:
+            loss=self.hist["losses"][l][-1]
+            logger.info(f"Loss {l} = {loss}")
         for m in self.metrics:
             value = self.hist[m]["train_mean"][-1]
             logger.info(f"Mean {m} = {value}")
@@ -115,8 +122,10 @@ class Histogram():
     def plot_hist(self ,savefolder):
         #plot loss
         plt.figure()
-        plt.plot(np.array(self.hist["loss"]))
+        for l in self.losses:
+            plt.plot(np.array(self.hist["losses"][l]), label= l)
         plt.title("Loss")
+        plt.legend()
         plt.savefig(os.path.join(savefolder,"Loss.png"), dpi=300, bbox_inches="tight", pad_inches=0.1)
         plt.close()
         for m in self.metrics:

@@ -143,6 +143,32 @@ class Mu_sigma(torch.nn.Module):
         #mu_sigma+=torch.mean((sigma_gt-sigma_mean)**2)
         return mu_sigma
 
+
+class Probs(torch.nn.Module):
+    def __init__(self, **kwargs):
+        super(Probs, self).__init__()
+    def forward(self, predictions, heart):    
+        (B,K,X,Y)=predictions.shape
+        l_blood=predictions[:,1,...][heart[:,0,...]==1]
+        l_muscle=predictions[:,2,...][heart[:,0,...]==1]
+        l_edema=predictions[:,3,...][heart[:,0,...]==1]
+        l_scar=predictions[:,4,...][heart[:,0,...]==1]
+        pred=torch.stack((l_blood, l_muscle, l_edema, l_scar))
+        
+        N=len(l_blood)
+        probs = (torch.sum(pred,axis=1)/N)
+        
+        # a=probs[0]
+        # probs=probs[1:]*(1/(1-a))
+        #print(probs.sum())
+        device= torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        probs_gt=torch.tensor([0.3839563844238861, 0.4023091477825316,  0.098236304180275, 0.11549816361330738]).to(device)
+        #print(probs_gt)
+        probs_loss = torch.mean((probs-probs_gt)**2)
+        return probs_loss
+    
+
+
 # class Likelyloss(torch.nn.Module):
 #     def __init__(self, **kwargs):
 #         super(Likelyloss, self).__init__()
@@ -295,6 +321,8 @@ def get_loss(crit="likely", **kwargs):
         return DiceLoss()
     elif crit == "mu_sigma":
         return Mu_sigma()
+    elif crit == "probs":
+        return Probs()
     else:
         return print("wrong crit!")
 
