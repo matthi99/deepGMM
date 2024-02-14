@@ -29,7 +29,7 @@ class Config:
                 cross_validation['fold_'+str(i)]['train'].append(p)
     
     
-    train_data_setup = {
+    train_data_setup_heart = {
         "spatialtransform":{
             "do_elastic_deform":True, 
             "alpha":(0.,175.),
@@ -39,8 +39,8 @@ class Config:
             "mode": "mean"
             },
         "ROI": {
-            "width": 80,
-            "height": 80,
+            "width": 160,
+            "height": 160,
             "translation": 4
             },
         "gamma": {
@@ -94,6 +94,17 @@ class Config:
         "ROI": {
             "width": 80,
             "height": 80,
+            "translation": 0
+            },
+    }  
+    
+    val_data_setup_heart = {
+        "normalize": {
+            "mode": "mean"
+            },
+        "ROI": {
+            "width": 160,
+            "height": 160,
             "translation": 0
             },
     }  

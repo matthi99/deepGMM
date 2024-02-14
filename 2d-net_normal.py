@@ -1,7 +1,6 @@
-
 # -*- coding: utf-8 -*-
 """
-Created on Wed Jan 25 09:22:44 2023
+Created on Wed Feb 14 17:36:36 2024
 
 @author: A0067501
 """
@@ -23,19 +22,19 @@ import numpy as np
 
 #Define parameters for training 
 parser = argparse.ArgumentParser(description='Define hyperparameters for training.')
-parser.add_argument('--epochs', type=int, default=20)
+parser.add_argument('--epochs', type=int, default=300)
 parser.add_argument('--batchsize', type=int, default=8)
 parser.add_argument('--batchnorm', type=bool, default=True)
 parser.add_argument('--start_filters', type=int, default=32)
 parser.add_argument('--out_channels', type=int, default=5)
 parser.add_argument('--activation', type=str, default="leakyrelu")
-parser.add_argument('--dropout', type=float, default=0.1)
-parser.add_argument('--fold', type=int, default=4)
+parser.add_argument('--dropout', type=float, default=0.05)
+parser.add_argument('--fold', type=int, default=0)
 parser.add_argument('--datafolder', help= "Path to 2d data folder", type=str, 
                     default="DATA/preprocessed/traindata2d/")
 parser.add_argument('--savepath', help= "Path were resuts should get saved", type=str, 
                     default="RESULTS_FOLDER/")
-parser.add_argument('--savefolder', type=str, default="2d-net_test_with_mu")
+parser.add_argument('--savefolder', type=str, default="2d-net_normal_")
 args = parser.parse_args()
 
 
@@ -135,7 +134,7 @@ for epoch in range(args.epochs):
         mu = mu_sigma(out, im, (1-mask["bg"]).float())
         #print("mu_sigma" , mu_sigma(out, im, (1-mask["bg"]).float()))
         pr = probs(out, (1-mask["bg"]).float())
-        loss += likely + mu
+        loss += likely
         loss.backward()
         torch.nn.utils.clip_grad_norm_(net.parameters(), 12)
         opt.step()
@@ -177,7 +176,7 @@ for epoch in range(args.epochs):
     for cl in ["blood","muscle", "edema",  "scar"]:
         val_metric+=histogram.hist[config['metrics'][0]][f"val_{cl}"][-1]
     val_metric=val_metric/2
-    if val_metric > best_metric:
+    if epoch%25==0:
         best_metric=val_metric
         config["best_metric"]=best_metric
         logger.info(f"New best Metric {best_metric}")
@@ -187,7 +186,7 @@ for epoch in range(args.epochs):
     
         
     logger.info(scheduler.get_last_lr())
-    #scheduler.step()
+    scheduler.step()
     
         
 np.save(os.path.join(path, savefolder, "histogram.npy"),histogram.hist)

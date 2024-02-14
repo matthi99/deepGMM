@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Feb 14 17:26:09 2024
+Created on Tue Feb  6 10:53:47 2024
 
 @author: A0067501
 """
@@ -41,7 +41,7 @@ def neg_log_likely(predictions, inputs, heart):
 
 def load_2dnet(path, device):
     params= yaml.load(open(path + "/config.json", 'r'), Loader=yaml.SafeLoader)['network']
-    weights = torch.load(path + f"/weights_700.pth",  map_location=torch.device(device))
+    weights = torch.load(path + f"/best_weights.pth",  map_location=torch.device(device))
     net2d = get_network(architecture='unet2d', device=device, **params)
     net2d.load_state_dict(weights)
     net2d.eval()
@@ -80,44 +80,6 @@ def order (pred, gt, means, gt_means):
             diff[j]=np.sum(abs(gt_means[j]-means[i]))
         cl= np.argmin(diff)
         ordered[pred == i]=cl
-    return ordered
-
-
-def dicecoeff(pred, gt):
-    eps=1 
-    intersection = (pred * gt).sum()
-    total = (pred + gt).sum()
-    coeff = (2 * intersection + eps) / (total + eps)
-    return coeff
-
-
-def order_dice(pred, gt):
-    ordered= np.zeros_like(pred)
-    for i in np.unique(pred)[1:]:
-        pred_class = (pred==i)*1
-        dice = np.zeros(4)
-        for j in range(1,5):
-            dice[j-1]= dicecoeff(pred_class, (gt==j)*1)
-        gt_class = np.argmax(dice)+1
-        ordered[pred_class==1]=gt_class
-    return ordered
-
-def order_dice1(pred, gt):
-    ordered= np.zeros_like(pred)
-    values=[]
-    for i in np.unique(gt)[1:]:
-        pred_gt = (gt==i)*1
-        dice = np.zeros(5)
-        for j in np.unique(pred)[1:].astype(int):
-            dice[j]= dicecoeff(pred_gt, (pred==j)*1)
-        value = np.argmax(dice)
-        while value in values:
-            dice[np.argmax(dice)]=0
-            value = np.argmax(dice)
-            
-        values.append(value)
-        ordered[pred==value]=i
-        pred[pred==value]==0
     return ordered
 
 
@@ -167,27 +129,23 @@ for file in files:
     C0 = X[2,...][mask_heart==1]
     in_gmm=np.stack((LGE,T2,C0), axis=1)
     
+    means_init= np.array([[ 1.13263178, -0.13630785,  1.6058956 ],
+                         [-0.41842756,  0.51262672, -0.00925156],
+                         [ 0.29902016,  1.25442789,  0.52296464],
+                         [ 1.15254939,  1.04698159,  0.3860968 ]])
     
-    gmm = GMM(n_components=4, covariance_type="diag")
+    
+    gmm = GMM(n_components=4, covariance_type="diag", means_init= means_init)
     gmm.fit(in_gmm)
     labels = gmm.predict(in_gmm)
     pred = np.zeros_like(mask_heart)
     pred[mask_heart==1]=labels+1
-    if len(np.unique(gt))==5:
-        pred = order_dice1(pred, gt)
-    else:
-        pred = order_dice(pred, gt)
-
-    pred_gmm = pred.copy()
-    
     
     dice_coeffs["EM"][f"Case_{patientnr}"]=[]
     for i in range(1,5):
         dice_coeffs["EM"][f"Case_{patientnr}"].append(Dice((pred==i)*1, (gt==i)*1))
 
                 
-
-
     # gmm_means = mean(X, pred)
     # gt_means = mean(X, gt)
     # means = np.zeros((5,3))
@@ -232,7 +190,7 @@ for file in files:
     """
     
     device= torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    path_net = "RESULTS_FOLDER/2d-net_test0"
+    path_net = "RESULTS_FOLDER/2d-net_test_with_mu0"
     net = load_2dnet(path_net, device)
     
     
@@ -242,13 +200,6 @@ for file in files:
     pred= net(in_nn)[0][0,...].cpu().detach().numpy()
     pred= np.argmax(pred, axis=0)
     pred[mask_heart==0]=0
-    
-    if len(np.unique(gt))==5:
-        pred = order_dice1(pred, pred_gmm)
-    else:
-        pred = order_dice(pred, pred_gmm)
-    
-
     
     dice_coeffs["Network"][f"Case_{patientnr}"]=[]
     for i in range(1,5):
@@ -279,7 +230,7 @@ for file in files:
     predictions_gt[2,...][gt==3]=1
     predictions_gt[3,...][gt==4]=1
     plt.text(0, 200, f'neg-ll: {np.round(neg_log_likely(predictions_gt, X, mask_heart)[0],3)}', fontsize = 9)
-    plt.savefig(os.path.join(f"RESULTS_FOLDER/RESULTS/normal/Case_{patientnr}_{file[-5:-4]}.png"), bbox_inches='tight', dpi=500)
+    plt.savefig(os.path.join(f"RESULTS_FOLDER/RESULTS/regularized/Case_{patientnr}_{file[-5:-4]}.png"), bbox_inches='tight', dpi=500)
     plt.show()
     
     
