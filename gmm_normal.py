@@ -82,7 +82,10 @@ def order (pred, gt, means, gt_means):
         ordered[pred == i]=cl
     return ordered
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> d7cf7d211d53bae76dd5549b0a3e89883373eab6
 def dicecoeff(pred, gt):
     eps=1 
     intersection = (pred * gt).sum()
@@ -101,6 +104,7 @@ def order_dice(pred, gt):
         gt_class = np.argmax(dice)+1
         ordered[pred_class==1]=gt_class
     return ordered
+<<<<<<< HEAD
 
 def order_dice1(pred, gt):
     ordered= np.zeros_like(pred)
@@ -130,6 +134,11 @@ def Dice(prediction, target):
         dice =(2 * intersection) / total 
         return dice
 
+=======
+    
+            
+    
+>>>>>>> d7cf7d211d53bae76dd5549b0a3e89883373eab6
 
 #%%
 #Prepare files
@@ -168,6 +177,10 @@ for file in files:
     in_gmm=np.stack((LGE,T2,C0), axis=1)
     
     
+<<<<<<< HEAD
+=======
+    
+>>>>>>> d7cf7d211d53bae76dd5549b0a3e89883373eab6
     gmm = GMM(n_components=4, covariance_type="diag")
     gmm.fit(in_gmm)
     labels = gmm.predict(in_gmm)
@@ -186,6 +199,7 @@ for file in files:
         dice_coeffs["EM"][f"Case_{patientnr}"].append(Dice((pred==i)*1, (gt==i)*1))
 
                 
+<<<<<<< HEAD
 
 
     # gmm_means = mean(X, pred)
@@ -193,6 +207,13 @@ for file in files:
     # means = np.zeros((5,3))
     # means[1:,:]= means_init
     # pred = order(pred, gt,  gmm_means, means)
+=======
+    gmm_means = mean(X, pred)
+    gt_means = mean(X, gt)
+    means = np.zeros((5,3))
+    means[1:,:]= means_init
+    pred = order_dice(pred, gt)
+>>>>>>> d7cf7d211d53bae76dd5549b0a3e89883373eab6
     
     plt.figure()
     plt.subplot(2,3,1)

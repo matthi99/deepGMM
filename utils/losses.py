@@ -162,7 +162,9 @@ class Probs(torch.nn.Module):
         # probs=probs[1:]*(1/(1-a))
         #print(probs.sum())
         device= torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        probs_gt=torch.tensor([0.3839563844238861, 0.4023091477825316,  0.098236304180275, 0.11549816361330738]).to(device)
+        
+        #probs_gt=torch.tensor([0.3839563844238861, 0.4023091477825316,  0.098236304180275, 0.11549816361330738]).to(device)
+        probs_gt = (torch.ones(4)/4).to(device)
         #print(probs_gt)
         probs_loss = torch.mean((probs-probs_gt)**2)
         return probs_loss
