@@ -2,7 +2,7 @@
 *.npy
 *.xlsx
 *.pt
-*.pdf
+
 
 # Folders
 RESULTS_FOLDER/
