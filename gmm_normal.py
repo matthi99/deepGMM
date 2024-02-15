@@ -82,10 +82,7 @@ def order (pred, gt, means, gt_means):
         ordered[pred == i]=cl
     return ordered
 
-<<<<<<< HEAD
 
-=======
->>>>>>> d7cf7d211d53bae76dd5549b0a3e89883373eab6
 def dicecoeff(pred, gt):
     eps=1 
     intersection = (pred * gt).sum()
@@ -104,7 +101,7 @@ def order_dice(pred, gt):
         gt_class = np.argmax(dice)+1
         ordered[pred_class==1]=gt_class
     return ordered
-<<<<<<< HEAD
+
 
 def order_dice1(pred, gt):
     ordered= np.zeros_like(pred)
@@ -122,6 +119,29 @@ def order_dice1(pred, gt):
         values.append(value)
         ordered[pred==value]=i
         pred[pred==value]==0
+    
+    ordered[ordered==4]=5
+    ordered[ordered==3]=4
+    ordered[ordered==5]=3
+    return ordered
+
+def order_dice2(pred, gt):
+    ordered= np.zeros_like(pred)
+    values=[]
+    for i in np.unique(gt)[1:]:
+        pred_gt = (gt==i)*1
+        dice = np.zeros(5)
+        for j in np.unique(pred)[1:].astype(int):
+            dice[j]= dicecoeff(pred_gt, (pred==j)*1)
+        value = np.argmax(dice)
+        while value in values:
+            dice[np.argmax(dice)]=0
+            value = np.argmax(dice)
+            
+        values.append(value)
+        ordered[pred==value]=i
+        pred[pred==value]==0
+    
     return ordered
 
 
@@ -134,11 +154,7 @@ def Dice(prediction, target):
         dice =(2 * intersection) / total 
         return dice
 
-=======
-    
-            
-    
->>>>>>> d7cf7d211d53bae76dd5549b0a3e89883373eab6
+
 
 #%%
 #Prepare files
@@ -177,10 +193,7 @@ for file in files:
     in_gmm=np.stack((LGE,T2,C0), axis=1)
     
     
-<<<<<<< HEAD
-=======
-    
->>>>>>> d7cf7d211d53bae76dd5549b0a3e89883373eab6
+
     gmm = GMM(n_components=4, covariance_type="diag")
     gmm.fit(in_gmm)
     labels = gmm.predict(in_gmm)
@@ -199,7 +212,7 @@ for file in files:
         dice_coeffs["EM"][f"Case_{patientnr}"].append(Dice((pred==i)*1, (gt==i)*1))
 
                 
-<<<<<<< HEAD
+
 
 
     # gmm_means = mean(X, pred)
@@ -207,13 +220,8 @@ for file in files:
     # means = np.zeros((5,3))
     # means[1:,:]= means_init
     # pred = order(pred, gt,  gmm_means, means)
-=======
-    gmm_means = mean(X, pred)
-    gt_means = mean(X, gt)
-    means = np.zeros((5,3))
-    means[1:,:]= means_init
-    pred = order_dice(pred, gt)
->>>>>>> d7cf7d211d53bae76dd5549b0a3e89883373eab6
+
+    
     
     plt.figure()
     plt.subplot(2,3,1)
@@ -265,7 +273,7 @@ for file in files:
     pred[mask_heart==0]=0
     
     if len(np.unique(gt))==5:
-        pred = order_dice1(pred, pred_gmm)
+        pred = order_dice2(pred, pred_gmm)
     else:
         pred = order_dice(pred, pred_gmm)
     
