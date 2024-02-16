@@ -128,6 +128,7 @@ class Mu_sigma(torch.nn.Module):
         
         mu_mean =mu_mean/B
         sigma_mean = sigma_mean/B
+        #mean mu and sigma over whole dataset
         mu_gt= torch.tensor([[ 1.13263178, -0.13630785,  1.6058956 ],
                              [-0.41842756,  0.51262672, -0.00925156],
                              [ 0.29902016,  1.25442789,  0.52296464],
@@ -142,6 +143,45 @@ class Mu_sigma(torch.nn.Module):
         
         #mu_sigma+=torch.mean((sigma_gt-sigma_mean)**2)
         return mu_sigma
+
+
+class Mu_zero(torch.nn.Module):
+    def __init__(self, **kwargs):
+        super(Mu_zero, self).__init__()
+    def forward(self, predictions, inputs, heart):
+        (B,K,X,Y)=predictions.shape
+        K=4
+        M=inputs.shape[1]
+        eps=1e-10
+        
+        mu_sigma=0
+        mu_gt= torch.tensor([[ 0.83197844, -0.4483231,   1.24550763],
+                             [-0.32757129, 0.09343397,  -0.23768631],
+                             [-0.16612703, 0.86548543,  -0.01431438],
+                             [ 1.09797224, 0.58989062,   0.46006127]])
+        for b in range(B):
+            l_blood=predictions[b,1,...][heart[b,0,...]==1]
+            l_muscle=predictions[b,2,...][heart[b,0,...]==1]
+            l_edema=predictions[b,3,...][heart[b,0,...]==1]
+            l_scar=predictions[b,4,...][heart[b,0,...]==1]
+            
+            in_LGE =inputs[b,0,...][heart[b,0,...]==1]
+            in_T2 = inputs[b,1,...][heart[b,0,...]==1]
+            in_C0 = inputs[b,2,...][heart[b,0,...]==1]
+            
+            inp= torch.stack((in_LGE, in_T2, in_C0))
+            pred=torch.stack((l_blood, l_muscle, l_edema, l_scar))
+            pred_mu=torch.stack((pred, pred, pred),1)
+            mu=torch.zeros((K,M))
+            var=torch.zeros((K,M))
+            for k in range(K):
+                for m in range(M):
+                    mu[k,m]=torch.sum(pred_mu[k,m,...]*inp[m,...])/(torch.sum(pred_mu[k,m,...])+eps)
+                    var[k,m]=(torch.sum(pred_mu[k,m,...]*(inp[m,...]-mu[k,m])**2)/(torch.sum(pred_mu[k,m,...])+eps))+eps
+            
+            mu_sigma+=torch.mean((mu_gt-mu)**2)
+        
+        return mu_sigma/B
 
 
 class Probs(torch.nn.Module):
@@ -323,6 +363,8 @@ def get_loss(crit="likely", **kwargs):
         return DiceLoss()
     elif crit == "mu_sigma":
         return Mu_sigma()
+    elif crit == "mu_0":
+        return Mu_zero()
     elif crit == "probs":
         return Probs()
     else:

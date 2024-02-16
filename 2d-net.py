@@ -30,16 +30,12 @@ parser.add_argument('--start_filters', type=int, default=32)
 parser.add_argument('--out_channels', type=int, default=5)
 parser.add_argument('--activation', type=str, default="leakyrelu")
 parser.add_argument('--dropout', type=float, default=0.1)
-<<<<<<< HEAD
-parser.add_argument('--fold', type=int, default=4)
-=======
 parser.add_argument('--fold', type=int, default=0)
->>>>>>> d7cf7d211d53bae76dd5549b0a3e89883373eab6
 parser.add_argument('--datafolder', help= "Path to 2d data folder", type=str, 
                     default="DATA/preprocessed/traindata2d/")
 parser.add_argument('--savepath', help= "Path were resuts should get saved", type=str, 
                     default="RESULTS_FOLDER/")
-parser.add_argument('--savefolder', type=str, default="2d-net_test_with_probs")
+parser.add_argument('--savefolder', type=str, default="2d-net_test_mu_zero_")
 args = parser.parse_args()
 
 
@@ -110,7 +106,7 @@ scheduler = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda=lambda1)
     
 likely_loss = get_loss(crit="likely") 
 dice_loss = get_loss(crit= "dice")
-mu_sigma = get_loss(crit= "mu_sigma")
+mu_0 = get_loss(crit= "mu_0")
 probs= get_loss(crit= 'probs')
 metrics={metric: get_metric(metric=metric) for metric in config['metrics']} 
 classes=config["classes"]
@@ -136,10 +132,10 @@ for epoch in range(args.epochs):
         #print("dice", loss)
         likely = likely_loss(out, im, (1-mask["bg"]).float())/10
         #print("likely_heart" , likely_loss(out, im, (1-mask["bg"]).float()))
-        mu = mu_sigma(out, im, (1-mask["bg"]).float())
+        mu = mu_0(out, im, (1-mask["bg"]).float())
         #print("mu_sigma" , mu_sigma(out, im, (1-mask["bg"]).float()))
         pr = probs(out, (1-mask["bg"]).float())
-        loss += likely + pr
+        loss += likely + mu
         loss.backward()
         torch.nn.utils.clip_grad_norm_(net.parameters(), 12)
         opt.step()

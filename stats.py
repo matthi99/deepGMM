@@ -29,13 +29,17 @@ for modality in modalities:
         means[modality][cl]=[]
         stds[modality][cl]=[]
         probs[cl]=[]
-    for file in files:
+    for file, i in zip(files, range(len(files))):
         z= np.load(os.path.join(folder, file), allow_pickle=True).item()
         center= z["center"]
         img= z[modality][center[0]-80:center[0]+80, center[1]-80: center[1]+80]
         img=(img - np.mean(img)) / np.std(img)
         mask= np.moveaxis(z["masks"], -1, 0)
         mask= mask[:,center[0]-80:center[0]+80, center[1]-80: center[1]+80]
+        plt.figure()
+        plt.imshow(np.argmax(mask,0))
+        plt.title(f"{file}_{i}")
+        plt.show()
         
         blood= img[mask[1,...]==1]
         muscle= img[mask[2,...]==1]
@@ -99,6 +103,22 @@ mu=np.zeros((4,3))
 for cl,i in zip(classes, range(4)):
     for modality,j in zip(modalities, range(3)):
         mu[i,j]=np.nanmean(means[modality][cl])
+    
+print(mu)
+
+
+sigma=np.zeros((4,3))
+for cl,i in zip(classes, range(4)):
+    for modality,j in zip(modalities, range(3)):
+        sigma[i,j]=np.nanmean(stds[modality][cl])
+    
+print(sigma)
+
+
+mu=np.zeros((4,3))
+for cl,i in zip(classes, range(4)):
+    for modality,j in zip(modalities, range(3)):
+        mu[i,j]=means[modality][cl][75]
     
 print(mu)
 
