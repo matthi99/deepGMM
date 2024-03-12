@@ -19,6 +19,57 @@ import random
 from skimage import measure
 
 
+
+def plot_single(X, out, gt, epoch, path):
+    X=X[0,...].cpu()
+    plt.figure()
+    plt.subplot(2,3,1)
+    plt.imshow(X[0,...])
+    plt.axis("off")
+    plt.title("LGE")
+    plt.subplot(2,3,2)
+    plt.imshow(X[1,...])
+    plt.axis("off")
+    plt.title("T2")
+    plt.subplot(2,3,3)
+    plt.imshow(X[2,...])
+    plt.axis("off")
+    plt.title("C0")
+    
+    pred = torch.argmax(out,1)[0,...].cpu()
+    plt.subplot(2,3,4)
+    plt.imshow(pred, vmin=0, vmax=4)
+    plt.axis("off")
+    plt.title("Prediction")
+    plt.subplot(2,3,5)
+    plt.imshow(gt.cpu(), vmin=0, vmax=4)
+    plt.axis("off")
+    plt.title("Ground truth")
+    plt.axis('off')
+    plt.savefig(path, dpi=300, bbox_inches="tight", pad_inches=0)
+    plt.show()
+    plt.close()    
+
+
+
+def normalize(img):
+    return (img - np.mean(img)) / np.std(img)
+
+
+def prepare_data(path_to_data):
+    data= np.load(path_to_data, allow_pickle=True).item()
+    gt= np.argmax(data['masks'][data["center"][0]-80:data["center"][0]+80,data["center"][1]-80:data["center"][1]+80,:],axis=2)
+    mask_heart= (1-data['masks'][:,:,0])[data["center"][0]-80:data["center"][0]+80,data["center"][1]-80:data["center"][1]+80]
+    LGE= data["LGE"][data["center"][0]-80:data["center"][0]+80,data["center"][1]-80:data["center"][1]+80]
+    T2 = data["T2"][data["center"][0]-80:data["center"][0]+80,data["center"][1]-80:data["center"][1]+80]
+    C0 = data["C0"][data["center"][0]-80:data["center"][0]+80,data["center"][1]-80:data["center"][1]+80]
+    LGE = normalize(LGE)
+    T2 = normalize(T2)
+    C0 = normalize(C0)
+    X=np.stack((LGE, T2, C0), axis=0)
+    return X, gt, mask_heart
+
+
 class Histogram():
     def __init__(self, classes, metrics, losses):
         self.classes = classes

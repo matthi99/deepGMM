@@ -22,11 +22,11 @@ import numpy as np
 
 #Define parameters for training 
 parser = argparse.ArgumentParser(description='Define hyperparameters for training.')
-parser.add_argument('--epochs', type=int, default=300)
+parser.add_argument('--epochs', type=int, default=100)
 parser.add_argument('--batchsize', type=int, default=8)
 parser.add_argument('--batchnorm', type=bool, default=True)
 parser.add_argument('--start_filters', type=int, default=32)
-parser.add_argument('--out_channels', type=int, default=5)
+parser.add_argument('--out_channels', type=int, default=4)
 parser.add_argument('--activation', type=str, default="leakyrelu")
 parser.add_argument('--dropout', type=float, default=0.05)
 parser.add_argument('--fold', type=int, default=0)
@@ -34,27 +34,10 @@ parser.add_argument('--datafolder', help= "Path to 2d data folder", type=str,
                     default="DATA/preprocessed/traindata2d/")
 parser.add_argument('--savepath', help= "Path were resuts should get saved", type=str, 
                     default="RESULTS_FOLDER/")
-parser.add_argument('--savefolder', type=str, default="2d-net_normal_")
+parser.add_argument('--type',type = str, help = "Type of Gaussian mixture model (normal,variant) ",  default = "variant")
+parser.add_argument('--lam',type = float, help = "Regularization parameter",  default = 0)
 args = parser.parse_args()
 
-
-
-#create save folders if they dont exist already
-path=args.savepath
-savefolder=args.savefolder+str(args.fold)+"/"
-if not os.path.exists(path):
-    os.makedirs(path)
-if not os.path.exists(os.path.join(path,savefolder)):
-    os.makedirs(os.path.join(path,savefolder))
-# if not os.path.exists(os.path.join(path,savefolder,'plots')):
-#     os.makedirs(os.path.join(path,savefolder,'plots'))   
-
-
-
-#define logger and get network configs
-logger= get_logger(savefolder)
-device= torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-logger.info(f"Training on {device}")
 config = {
         "metrics":["dice"],
     "network":{
@@ -72,6 +55,37 @@ config = {
     "best_metric":-float('inf'),
     "fold":args.fold
 }
+
+#create save folders if they dont exist already
+path=args.savepath
+reg_loss = get_loss(crit="mu_sigma") 
+if args.type == "normal":
+    main_loss = get_loss(crit="NormalGMM") 
+    if args.lam == 0:
+        savefolder = f"normal_GMM/mutiple/"
+    else:
+        savefolder = f"normal_GMM/mutiple_reg_{args.lam}/"
+        
+    
+elif args.type == "variant":
+    main_loss = get_loss(crit="VariantGMM") 
+    if args.lam == 0:
+        savefolder = f"spatially_variant_GMM/mutiple/"
+    else:
+        savefolder = f"spatially_variant_GMM/mutiple_reg_{args.lam}/"
+else:
+    print("Wrong type specified")
+    
+
+if not os.path.exists(os.path.join(path,savefolder, "plots")):
+    os.makedirs(os.path.join(path,savefolder, "plots"))
+
+
+#define logger and get network configs
+logger= get_logger(savefolder)
+device= torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+logger.info(f"Training on {device}")
+
 setup_train=Config.train_data_setup_no_aug
 setup_val=Config.val_data_setup
 if args.fold<5:
@@ -81,7 +95,6 @@ if args.fold<5:
 else:
     logger.info("using own data split")
 
-   
 
 #get dataloaders     
 cd_train = CardioDataset(folder=args.datafolder ,z_dim=False,  **setup_train)
@@ -94,19 +107,18 @@ dataloader_eval = torch.utils.data.DataLoader(cd_val, batch_size=args.batchsize,
                                                         shuffle=False)
 
 
-
 #get network, optimizer, loss, metric and histogramm    
 net=get_network(architecture="unet2d", **config["network"]).to(device)
-# opt = torch.optim.SGD(net.parameters(), 5*1e-3, weight_decay=1e-3,
-#                                           momentum=0.99, nesterov=True)   
-opt = torch.optim.AdamW(net.parameters(), weight_decay=1e-3,lr=1e-3)
+opt = torch.optim.SGD(net.parameters(), 5*1e-3, weight_decay=1e-3,
+                                          momentum=0.99, nesterov=True)   
+#opt = torch.optim.AdamW(net.parameters(), weight_decay=1e-3,lr=1e-3)
 lambda1 = lambda epoch: (1-epoch/args.epochs)**0.9
 scheduler = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda=lambda1)
     
-likely_loss = get_loss(crit="likely") 
-dice_loss = get_loss(crit= "dice")
-mu_sigma = get_loss(crit= "mu_sigma")
-probs= get_loss(crit= 'probs')
+# likely_loss = get_loss(crit="likely") 
+# dice_loss = get_loss(crit= "dice")
+# mu_sigma = get_loss(crit= "mu_sigma")
+# probs= get_loss(crit= 'probs')
 metrics={metric: get_metric(metric=metric) for metric in config['metrics']} 
 classes=config["classes"]
 losses= ["likely", "mu", "dice"]
@@ -127,23 +139,16 @@ for epoch in range(args.epochs):
         gt= torch.cat([mask[key].float() for key in mask.keys()],1)
         out=net(im)[0]
         out_heart= 1-out[:,0:1,...]
-        dice = dice_loss(out_heart, (1-mask["bg"]).float())
-        #print("dice", loss)
-        likely = likely_loss(out, im, (1-mask["bg"]).float())/10
-        #print("likely_heart" , likely_loss(out, im, (1-mask["bg"]).float()))
-        mu = mu_sigma(out, im, (1-mask["bg"]).float())
-        #print("mu_sigma" , mu_sigma(out, im, (1-mask["bg"]).float()))
-        pr = probs(out, (1-mask["bg"]).float())
-        loss += likely
+        loss += main_loss(out, im, (1-mask["bg"]).float())
+        loss+= args.lam *reg_loss(out, im, (1-mask["bg"]).float())
         loss.backward()
         torch.nn.utils.clip_grad_norm_(net.parameters(), 12)
         opt.step()
-        histogram.add_loss("likely", likely)
-        histogram.add_loss("mu", mu)
-        histogram.add_loss("dice", dice)
-        out[:,0:1,:,:][mask["bg"].float()==1]=1
-        for i in range(1,5):
-            out[:,i:i+1,:,:][mask["bg"].float()==1]=0
+        histogram.add_loss("likely", loss)
+        # histogram.add_loss("mu", mu)
+        # histogram.add_loss("dice", dice)
+        out=out*(1-mask["bg"]).float()
+        out =torch.cat((mask["bg"],out),1)
         histogram.add_train_metrics(out,gt)
         steps += 1
     
@@ -159,9 +164,8 @@ for epoch in range(args.epochs):
         with torch.no_grad():
             gt= torch.cat([mask[key].float() for key in mask.keys()],1)
             out=net(im)[0]
-            out[:,0:1,:,:][mask["bg"].float()==1]=1
-            for i in range(1,5):
-                out[:,i:i+1,:,:][mask["bg"].float()==1]=0
+            out=out*(1-mask["bg"]).float()
+            out =torch.cat((mask["bg"],out),1)
             histogram.add_val_metrics(out,gt)
             steps += 1
     

@@ -10,6 +10,83 @@ import torch
 from torch import nn
 
 
+
+class VariantGMM(torch.nn.Module):
+    def __init__(self, **kwargs):
+        super(VariantGMM, self).__init__()
+        self.device= torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    def forward(self, predictions, inputs, heart):
+        (B,K,X,Y)=predictions.shape
+        M=inputs.shape[1]
+        eps=1e-10
+        likelylosses=torch.zeros(B)
+        
+        for b in range(B):
+            pred = []
+            for cl in range(K):
+                pred.append(predictions[b,cl,...][heart[b,0,...]==1])
+            pred = torch.stack(pred,dim=0)
+            inp=[]
+            for ch in range(M):
+                inp.append(inputs[b,ch,...][heart[b,0,...]==1])
+            inp = torch.stack(inp,dim=0)
+            
+            mu=torch.zeros((K,M))
+            var=torch.zeros((K,M))
+            for k in range(K):
+                for m in range(M):
+                    mu[k,m]=torch.sum(pred[k,...]*inp[m,...])/(torch.sum(pred[k,...])+eps)
+                    var[k,m]=(torch.sum(pred[k,...]*(inp[m,...]-mu[k,m])**2)/(torch.sum(pred[k,...])+eps))+eps
+            temp=torch.zeros((K,M,inp.shape[1])).to(self.device)
+            for k in range(K):
+                for m in range(M):
+                    temp[k,m,...]=(1/(torch.sqrt(2*torch.pi*var[k,m])))*torch.exp(-((inp[m,...]-mu[k,m])**2/(2*var[k,m])))
+            temp =  torch.prod(temp,1)
+            temp= pred * temp
+            likelylosses[b]=-torch.mean(torch.log(torch.sum(temp,axis=0)+eps))
+        return torch.mean(likelylosses)
+
+
+class NormalGMM(torch.nn.Module):
+    def __init__(self, **kwargs):
+        super(NormalGMM, self).__init__()
+        self.device= torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    def forward(self, predictions, inputs, heart):
+        (B,K,X,Y)=predictions.shape
+        M=inputs.shape[1]
+        eps=1e-10
+        likelylosses=torch.zeros(B)
+        
+        for b in range(B):
+            pred = []
+            for cl in range(K):
+                pred.append(predictions[b,cl,...][heart[b,0,...]==1])
+            pred = torch.stack(pred,dim=0)
+            inp=[]
+            for ch in range(M):
+                inp.append(inputs[b,ch,...][heart[b,0,...]==1])
+            inp = torch.stack(inp,dim=0)
+            
+            alpha = torch.mean(pred,1)
+            mu=torch.zeros((K,M))
+            var=torch.zeros((K,M))
+            for k in range(K):
+                for m in range(M):
+                    mu[k,m]=torch.sum(pred[k,...]*inp[m,...])/(torch.sum(pred[k,...])+eps)
+                    var[k,m]=(torch.sum(pred[k,...]*(inp[m,...]-mu[k,m])**2)/(torch.sum(pred[k,...])+eps))+eps
+
+            temp=torch.zeros((K,M,inp.shape[1])).to(self.device)
+            for k in range(K):
+                for m in range(M):
+                    temp[k,m,...]=(1/(torch.sqrt(2*torch.pi*var[k,m])))*torch.exp(-((inp[m,...]-mu[k,m])**2/(2*var[k,m])))
+            temp =  torch.prod(temp,1)
+            temp = alpha[:,None]*temp
+            
+            likelylosses[b]=-torch.mean(torch.log(torch.sum(temp,axis=0)+eps))
+            #print(alpha)
+        return torch.mean(likelylosses)
+
+
 class Likelyloss(torch.nn.Module):
     def __init__(self, **kwargs):
         super(Likelyloss, self).__init__()
@@ -75,7 +152,7 @@ class Likelyloss(torch.nn.Module):
             
             likelylosses[b]=-torch.mean(torch.log(torch.sum(torch.prod(temp,1),axis=0)+eps))
             #print(mu_gt)
-            
+            print(mu, var)
             
         likelyloss=torch.mean(likelylosses)
         
@@ -98,35 +175,30 @@ class Mu_sigma(torch.nn.Module):
         super(Mu_sigma, self).__init__()
     def forward(self, predictions, inputs, heart):
         (B,K,X,Y)=predictions.shape
-        K=4
         M=inputs.shape[1]
         eps=1e-10
         mu_mean=torch.zeros((K,M))
         sigma_mean=torch.zeros((K,M))
-        mu_sigma=0
         for b in range(B):
-            l_blood=predictions[b,1,...][heart[b,0,...]==1]
-            l_muscle=predictions[b,2,...][heart[b,0,...]==1]
-            l_edema=predictions[b,3,...][heart[b,0,...]==1]
-            l_scar=predictions[b,4,...][heart[b,0,...]==1]
-            
-            in_LGE =inputs[b,0,...][heart[b,0,...]==1]
-            in_T2 = inputs[b,1,...][heart[b,0,...]==1]
-            in_C0 = inputs[b,2,...][heart[b,0,...]==1]
-            
-            inp= torch.stack((in_LGE, in_T2, in_C0))
-            pred=torch.stack((l_blood, l_muscle, l_edema, l_scar))
-            pred_mu=torch.stack((pred, pred, pred),1)
+            pred = []
+            for cl in range(K):
+                pred.append(predictions[b,cl,...][heart[b,0,...]==1])
+            pred = torch.stack(pred,dim=0)
+            inp=[]
+            for ch in range(M):
+                inp.append(inputs[b,ch,...][heart[b,0,...]==1])
+            inp = torch.stack(inp,dim=0)
             mu=torch.zeros((K,M))
             var=torch.zeros((K,M))
             for k in range(K):
                 for m in range(M):
-                    mu[k,m]=torch.sum(pred_mu[k,m,...]*inp[m,...])/(torch.sum(pred_mu[k,m,...])+eps)
-                    var[k,m]=(torch.sum(pred_mu[k,m,...]*(inp[m,...]-mu[k,m])**2)/(torch.sum(pred_mu[k,m,...])+eps))+eps
+                    mu[k,m]=torch.sum(pred[k,...]*inp[m,...])/(torch.sum(pred[k,...])+eps)
+                    var[k,m]=(torch.sum(pred[k,...]*(inp[m,...]-mu[k,m])**2)/(torch.sum(pred[k,...])+eps))+eps
+
             mu_mean+=mu    
             sigma_mean+=torch.sqrt(var)
         
-        mu_mean =mu_mean/B
+        mu_mean = mu_mean/B
         sigma_mean = sigma_mean/B
         #mean mu and sigma over whole dataset
         mu_gt= torch.tensor([[ 1.13263178, -0.13630785,  1.6058956 ],
@@ -139,10 +211,8 @@ class Mu_sigma(torch.nn.Module):
                                 [0.71600954, 0.45154963, 0.58179293],
                                 [0.80249576, 0.5147093,  0.50932555]])
         
-        mu_sigma+=torch.mean((mu_gt-mu_mean)**2)
         
-        #mu_sigma+=torch.mean((sigma_gt-sigma_mean)**2)
-        return mu_sigma
+        return torch.sum((mu_gt-mu_mean)**2)
 
 
 class Mu_zero(torch.nn.Module):
@@ -367,6 +437,10 @@ def get_loss(crit="likely", **kwargs):
         return Mu_zero()
     elif crit == "probs":
         return Probs()
+    elif crit == "NormalGMM":
+        return NormalGMM()
+    elif crit == "VariantGMM":
+        return VariantGMM()
     else:
         return print("wrong crit!")
 
