@@ -96,7 +96,9 @@ for patient in train_patients:
         data2d['T2']=data['T2'][i,...]
         data2d['C0']=data['C0'][i,...]
         data2d['masks']=data['masks'][i,...]
-        np.save(os.path.join(save_folder2d, patient[:-4]+'_'+str(i)+'.npy'), data2d)
+        temp = np.argmax(data['masks'][i,...],-1)
+        if (len(np.unique(temp)))==5:
+            np.save(os.path.join(save_folder2d, patient[:-4]+'_'+str(i)+'.npy'), data2d)
             
     
 print("Data prepared!")

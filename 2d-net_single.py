@@ -25,11 +25,7 @@ import argparse
 import json
 import numpy as np
 import matplotlib.pyplot as plt
-
-
-
-
-    
+import logging
 
 
 parser = argparse.ArgumentParser(description='Define hyperparameters for training.')
@@ -45,6 +41,7 @@ parser.add_argument('--savepath', help= "Path were resuts should get saved", typ
                     default="RESULTS_FOLDER/")
 parser.add_argument('--type',type = str, help = "Type of Gaussian mixture model (normal,variant) ",  default = "normal")
 parser.add_argument('--lam',type = float, help = "Regularization parameter",  default = 0)
+parser.add_argument('--tol',type = float, help = "Tolerance for stopping criteria",  default = 0.005)
 args = parser.parse_args()
 
 
@@ -86,7 +83,8 @@ else:
     print("Wrong type specified")
 
 logger= get_logger(savefolder)
-
+FileOutputHandler = logging.FileHandler(path+savefolder+"logs.log")
+logger.addHandler(FileOutputHandler)
 if not os.path.exists(os.path.join(path,savefolder,"plots")):
     os.makedirs(os.path.join(path,savefolder,"plots"))
 
@@ -130,13 +128,16 @@ for patient in patients:
         
         #train
         best_metric=-float('inf')
+        train_loss = float('inf')
         for epoch in range(args.epochs):
             net.train()
             logger.info(f"Epoch {epoch}\{args.epochs}-------------------------------")
+            prev_train_loss = train_loss
             opt.zero_grad()
             loss=0
             out=net(X)[0]
             loss += main_loss(out, X, mask_heart.float())
+            train_loss =  main_loss(out, X, mask_heart.float())
             loss+= args.lam *reg_loss(out, X, mask_heart.float())
             loss.backward()
             torch.nn.utils.clip_grad_norm_(net.parameters(), 12)
@@ -144,13 +145,19 @@ for patient in patients:
             histogram.append(loss.item())
             out=out*mask_heart
             out =torch.cat((1-mask_heart,out),1)
+            change = (prev_train_loss-train_loss).item()
             #scheduler.step()
-            
+            print(change)
+            if abs(change) < args.tol:
+                save_checkpoint(net, os.path.join(path, savefolder), f"weights",  savepath=True)
+                json.dump(config, open(os.path.join(path,savefolder,"config.json"), "w"))
+                break
         
         plot_single(X, out, gt, epoch, os.path.join(path,savefolder,f"Patient_{patient}",f"final_{i}.png"))
         plt.figure()
         plt.plot(histogram)
         plt.savefig(os.path.join(path,savefolder,f"Patient_{patient}",f"histogram_{i}.png"), dpi=300, bbox_inches="tight", pad_inches=0)
+        #plt.show()
         plt.close()
         i+=1
             

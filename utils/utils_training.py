@@ -47,7 +47,7 @@ def plot_single(X, out, gt, epoch, path):
     plt.title("Ground truth")
     plt.axis('off')
     plt.savefig(path, dpi=300, bbox_inches="tight", pad_inches=0)
-    plt.show()
+    #plt.show()
     plt.close()    
 
 

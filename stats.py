@@ -10,10 +10,17 @@ import matplotlib.pyplot as plt
 import os
 import seaborn as sns
 
+ 
+
 
 folder = "DATA/preprocessed/traindata2d/"
 
 files= os.listdir(folder)
+
+np.random.seed(42)
+np.random.shuffle(files)
+files = files[0:10]
+
 
 modalities = ["LGE", "T2", "C0"]
 classes = ["blood", "muscle", "edema", "scar"]
@@ -102,7 +109,7 @@ print("Scar:", np.mean(probs["scar"]))
 mu=np.zeros((4,3))
 for cl,i in zip(classes, range(4)):
     for modality,j in zip(modalities, range(3)):
-        mu[i,j]=np.nanmean(means[modality][cl])
+        mu[i,j]=np.mean(means[modality][cl])
     
 print(mu)
 
@@ -110,7 +117,7 @@ print(mu)
 sigma=np.zeros((4,3))
 for cl,i in zip(classes, range(4)):
     for modality,j in zip(modalities, range(3)):
-        sigma[i,j]=np.nanmean(stds[modality][cl])
+        sigma[i,j]=np.mean(stds[modality][cl])
     
 print(sigma)
 
