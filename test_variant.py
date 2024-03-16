@@ -28,9 +28,9 @@ import pandas as pd
 lam = 1.0
 
 if lam == 0:
-    savefolder = "RESULTS_FOLDER/RESULTS/variant/unregularized/"
+    savefolder = "RESULTS_FOLDER/RESULTS/spatially_variant_GMM/multiple/"
 else:
-    savefolder = f"RESULTS_FOLDER/RESULTS/variant/regularized/lamda_{lam}/"
+    savefolder = f"RESULTS_FOLDER/RESULTS/spatially_variant_GMM/multiple_reg_{lam}/"
 
 if not os.path.exists(savefolder):
     os.makedirs(savefolder)
@@ -84,7 +84,7 @@ for file in files:
                              [-0.38956344,  0.35907112,  0.00187305],
                              [ 0.12236157,  0.99027221,  0.42901193],
                              [ 1.25641782,  0.86135793,  0.53020001]])
-        gmm = VariantGMM(n_components=4, means_init=means_init,  tol=0.001)
+        gmm = VariantGMM(n_components=4, means_init=means_init,  tol=0.005)
     
     
     gmm.fit(in_gmm)
@@ -149,9 +149,9 @@ for file in files:
     
     device= torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     if lam == 0:
-        path_net = "RESULTS_FOLDER/spatially_variant_GMM/mutiple/"
+        path_net = "RESULTS_FOLDER/spatially_variant_GMM/multiple/"
     else:
-        path_net = f"RESULTS_FOLDER/spatially_variant_GMM/mutiple_reg_{lam}/"
+        path_net = f"RESULTS_FOLDER/spatially_variant_GMM/multiple_reg_{lam}/"
     net = load_2dnet(path_net, device)
     
     

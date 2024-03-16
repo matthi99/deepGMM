@@ -29,9 +29,9 @@ import pandas as pd
 lam = 2.0
 
 if lam == 0:
-    savefolder = "RESULTS_FOLDER/RESULTS/normal/unregularized/"
+    savefolder = "RESULTS_FOLDER/RESULTS/normal_GMM/multiple/"
 else:
-    savefolder = f"RESULTS_FOLDER/RESULTS/normal/regularized/lamda_{lam}/"
+    savefolder = f"RESULTS_FOLDER/RESULTS/normal_GMM/multiple_reg_{lam}/"
 
 if not os.path.exists(savefolder):
     os.makedirs(savefolder)
@@ -154,9 +154,9 @@ for file in files:
     
     device= torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     if lam == 0:
-        path_net = "RESULTS_FOLDER/normal_GMM/mutiple/"
+        path_net = "RESULTS_FOLDER/normal_GMM/multiple/"
     else:
-        path_net = f"RESULTS_FOLDER/normal_GMM/mutiple_reg_{lam}/"
+        path_net = f"RESULTS_FOLDER/normal_GMM/multiple_reg_{lam}/"
     net = load_2dnet(path_net, device)
     
     

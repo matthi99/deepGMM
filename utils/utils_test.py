@@ -100,6 +100,16 @@ def load_2dnet(path, device):
     net2d.eval()
     return net2d
 
+
+def load_2dnet_single(path, device):
+    path_params = path[0:-13]+"config.json"
+    params= yaml.load(open(path_params, 'r'), Loader=yaml.SafeLoader)['network']
+    weights = torch.load(path,  map_location=torch.device(device))
+    net2d = get_network(architecture='unet2d', device=device, **params)
+    net2d.load_state_dict(weights)
+    net2d.eval()
+    return net2d
+
 def dicecoeff(prediction, target):
     intersection = np.sum(prediction * target)
     total =  np.sum(prediction + target)

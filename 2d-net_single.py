@@ -78,15 +78,17 @@ elif args.type == "variant":
     if args.lam == 0:
         savefolder = f"spatially_variant_GMM/single/"
     else:
-        savefolder = f"spatially_variant_GMM/single_reg{args.lam}/"
+        savefolder = f"spatially_variant_GMM/single_reg_{args.lam}/"
 else:
     print("Wrong type specified")
+
+if not os.path.exists(os.path.join(path,savefolder,"plots")):
+    os.makedirs(os.path.join(path,savefolder,"plots"))
 
 logger= get_logger(savefolder)
 FileOutputHandler = logging.FileHandler(path+savefolder+"logs.log")
 logger.addHandler(FileOutputHandler)
-if not os.path.exists(os.path.join(path,savefolder,"plots")):
-    os.makedirs(os.path.join(path,savefolder,"plots"))
+
 
     
 device= torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -112,8 +114,9 @@ for patient in patients:
     files = [os.path.join(args.datafolder,f) for f in os.listdir(args.datafolder) if int(f.split("_")[-2])==patient]
     if not os.path.exists(os.path.join(path,savefolder,f"Patient_{patient}")):
         os.makedirs(os.path.join(path,savefolder,f"Patient_{patient}"))
-    i=0
+    
     for file in files:
+        slicenr = file[-5]
         net=get_network(architecture="unet2d", **config["network"]).to(device)
         # opt = torch.optim.SGD(net.parameters(), 1e-3, weight_decay=1e-3,
         #                                             momentum=0.99, nesterov=True)   
@@ -148,18 +151,18 @@ for patient in patients:
             change = (prev_train_loss-train_loss).item()
             #scheduler.step()
             print(change)
-            if abs(change) < args.tol:
-                save_checkpoint(net, os.path.join(path, savefolder), f"weights",  savepath=True)
-                json.dump(config, open(os.path.join(path,savefolder,"config.json"), "w"))
+            if (epoch > 10  and  abs(change) < args.tol):
+                save_checkpoint(net, os.path.join(path, savefolder, f"Patient_{patient}"), 0,  f"weights_{slicenr}")
+                json.dump(config, open(os.path.join(path,savefolder,f"Patient_{patient}","config.json"), "w"))
                 break
         
-        plot_single(X, out, gt, epoch, os.path.join(path,savefolder,f"Patient_{patient}",f"final_{i}.png"))
+        plot_single(X, out, gt, epoch, os.path.join(path,savefolder,f"Patient_{patient}",f"final_{slicenr}.png"))
         plt.figure()
         plt.plot(histogram)
-        plt.savefig(os.path.join(path,savefolder,f"Patient_{patient}",f"histogram_{i}.png"), dpi=300, bbox_inches="tight", pad_inches=0)
+        plt.savefig(os.path.join(path,savefolder,f"Patient_{patient}",f"histogram_{slicenr}.png"), dpi=300, bbox_inches="tight", pad_inches=0)
         #plt.show()
         plt.close()
-        i+=1
+        
             
 
 
