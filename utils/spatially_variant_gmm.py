@@ -33,9 +33,10 @@ class VariantGMM():
         
     
     def initialize_parameters(self, X):
-        gmm = GMM(n_components=self.n_components, covariance_type="diag", max_iter=0, 
-                  init_params = self.init_params,means_init = self.means_init)
-        gmm._initialize_parameters(X,gmm.random_state)
+        gmm = GMM(n_components=self.n_components, covariance_type="diag", max_iter=1, 
+                  init_params = "random" ,means_init = self.means_init)
+        #gmm._initialize_parameters(X,gmm.random_state)
+        gmm.fit(X)
         self.means_ = gmm.means_
         self.covariances_ = gmm.covariances_
         self.weights_ = gmm.predict_proba(X)

@@ -151,11 +151,12 @@ for patient in patients:
             change = (prev_train_loss-train_loss).item()
             #scheduler.step()
             print(change)
-            if (epoch > 10  and  abs(change) < args.tol):
-                save_checkpoint(net, os.path.join(path, savefolder, f"Patient_{patient}"), 0,  f"weights_{slicenr}")
-                json.dump(config, open(os.path.join(path,savefolder,f"Patient_{patient}","config.json"), "w"))
+            if (epoch > 10  and  abs(change) < args.tol):    
                 break
+            
         
+        save_checkpoint(net, os.path.join(path, savefolder, f"Patient_{patient}"), 0,  name = f"weights_{slicenr}")
+        json.dump(config, open(os.path.join(path,savefolder,f"Patient_{patient}","config.json"), "w"))
         plot_single(X, out, gt, epoch, os.path.join(path,savefolder,f"Patient_{patient}",f"final_{slicenr}.png"))
         plt.figure()
         plt.plot(histogram)

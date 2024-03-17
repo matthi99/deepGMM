@@ -26,7 +26,7 @@ import pandas as pd
 #%%
 #Prepare files
 
-lam = 2.0
+lam = 0
 
 if lam == 0:
     savefolder = "RESULTS_FOLDER/RESULTS/normal_GMM/multiple/"
@@ -81,7 +81,7 @@ for file in files:
     
     
     if lam == 0:
-        gmm = GMM(n_components=4, covariance_type="diag", tol=0.005)
+        gmm = GMM(n_components=4, covariance_type="diag", tol=0.001, init_params= "random")
     else:
         means_init= np.array([[ 1.0907561,  -0.15736851,  1.70052552],
                              [-0.38956344,  0.35907112,  0.00187305],
