@@ -18,7 +18,8 @@ class VariantGMM():
                  init_params = "random", 
                  weights_init = None, 
                  covariances_init=None, 
-                 max_iter = 100):
+                 max_iter = 100,
+                 random_state = None):
         self.tol = tol
         self.means = means_init
         self.init_params = init_params
@@ -30,11 +31,12 @@ class VariantGMM():
         self.covariances_ = covariances_init
         self.reg_covar = 1e-6
         self.max_iter = max_iter
+        self.random_state = random_state
         
     
     def initialize_parameters(self, X):
         gmm = GMM(n_components=self.n_components, covariance_type="diag", max_iter=1, 
-                  init_params = "random" ,means_init = self.means_init)
+                  init_params = "random" ,means_init = self.means_init, random_state=self.random_state)
         #gmm._initialize_parameters(X,None)
         gmm.fit(X)
         self.means_ = gmm.means_

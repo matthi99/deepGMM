@@ -29,7 +29,7 @@ import logging
 
 
 parser = argparse.ArgumentParser(description='Define hyperparameters for training.')
-parser.add_argument('--epochs', type=int, default=100)
+parser.add_argument('--epochs', type=int, default=200)
 parser.add_argument('--batchnorm', type=bool, default=True)
 parser.add_argument('--start_filters', type=int, default=32)
 parser.add_argument('--out_channels', type=int, default=4)
@@ -110,6 +110,7 @@ classes=config["classes"]
 
 
 patients = Config.cross_validation[f"fold_0"]['val']
+patients = Config.all_patients
 for patient in patients:
     files = [os.path.join(args.datafolder,f) for f in os.listdir(args.datafolder) if int(f.split("_")[-2])==patient]
     if not os.path.exists(os.path.join(path,savefolder,f"Patient_{patient}")):

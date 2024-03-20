@@ -32,7 +32,7 @@ def prepare_data(path_to_data):
 def variant_log_likelyhood(predictions, inputs, heart):
     (K,X,Y)=predictions.shape
     M=inputs.shape[0]
-    eps=1e-10
+    eps=1e-14
     
     pred = []
     for cl in range(K):
@@ -64,7 +64,7 @@ def variant_log_likelyhood(predictions, inputs, heart):
 def normal_log_likelyhood(predictions, inputs, heart):
     (K,X,Y)=predictions.shape
     M=inputs.shape[0]
-    eps=1e-10
+    eps=1e-14
     
     pred = []
     for cl in range(K):
