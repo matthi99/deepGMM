@@ -6,9 +6,7 @@ Created on Thu Dec  1 17:27:15 2022
 """
 import nibabel as nib
 import numpy as np
-import matplotlib.pyplot as plt
 import os
-import cv2
 from scipy import ndimage
 
 data_folder = "DATA"
@@ -19,7 +17,7 @@ preprocessed_folder= os.path.join(data_folder, 'preprocessed')
 if not os.path.exists(preprocessed_folder):
     os.makedirs(preprocessed_folder)
     
-save_folder= os.path.join(preprocessed_folder, 'traindata3d/')
+save_folder= os.path.join(preprocessed_folder, 'myops_2d/')
 if not os.path.exists(save_folder):
     os.makedirs(save_folder)
         
@@ -68,27 +66,12 @@ for gt, im_LGE, im_T2, im_C0 in zip(files_gt, files_LGE, files_T2, files_C0):
     
     middle= bg[bg.shape[0]//2,...]
     middle= 1-middle
-    center=ndimage.measurements.center_of_mass(middle)
+    center=ndimage.center_of_mass(middle)
     data['center']=(int(center[0]), int(center[1]))
 
     masks=np.concatenate((bg[...,None], blood[...,None], muscle[...,None], edema[...,None], scar[...,None]), axis=3)
     data['masks']=masks
-    
-    #save
-    np.save(os.path.join(save_folder, "Case_"+patient_nr+'.npy'), data)
-    
-    
-#2d data
-save_folder2d = os.path.join(preprocessed_folder, 'traindata2d/')
-if not os.path.exists(save_folder2d):
-    os.makedirs(save_folder2d)
-        
-train_patients= os.listdir(save_folder)
-slices=[]
-for patient in train_patients:
-    data=np.load(save_folder+patient, allow_pickle=True).item()
     L=data['LGE'].shape[0]
-    slices.append(L)
     for i in range(L):
         data2d={}
         data2d['center']=data['center']
@@ -98,9 +81,87 @@ for patient in train_patients:
         data2d['masks']=data['masks'][i,...]
         temp = np.argmax(data['masks'][i,...],-1)
         if (len(np.unique(temp)))==5:
-            np.save(os.path.join(save_folder2d, patient[:-4]+'_'+str(i)+'.npy'), data2d)
-            
+            np.save(os.path.join(save_folder, "Case_"+patient_nr+'_'+str(i)+'.npy'), data2d)
+                      
+
+# Get Mu_data for regularization
+
+folder = "DATA/preprocessed/myops_2d/"
+files= os.listdir(folder)
+
+np.random.seed(42)
+np.random.shuffle(files)
+files = files[0:10]
+
+
+modalities = ["LGE", "T2", "C0"]
+classes = ["blood", "muscle", "edema", "scar"]
+
+
+means={}
+probs={}
+stds={}
+for modality in modalities:
+    means[modality]={}
+    stds[modality]={}
+    for cl in classes:
+        means[modality][cl]=[]
+        stds[modality][cl]=[]
+        probs[cl]=[]
+    for file, i in zip(files, range(len(files))):
+        z= np.load(os.path.join(folder, file), allow_pickle=True).item()
+        center= z["center"]
+        img= z[modality][center[0]-80:center[0]+80, center[1]-80: center[1]+80]
+        img=(img - np.mean(img)) / np.std(img)
+        mask= np.moveaxis(z["masks"], -1, 0)
+        mask= mask[:,center[0]-80:center[0]+80, center[1]-80: center[1]+80]
+       
+        blood= img[mask[1,...]==1]
+        muscle= img[mask[2,...]==1]
+        edema= img[mask[3,...]==1]
+        scar= img[mask[4,...]==1]
+        heart= img[mask[0,...]==0]
+        N = len(heart)
+        
+        means[modality]["blood"].append(blood.mean())
+        means[modality]["muscle"].append(muscle.mean())
+        means[modality]["edema"].append(edema.mean())
+        means[modality]["scar"].append(scar.mean())
+        
+        
+        stds[modality]["blood"].append(blood.std())
+        stds[modality]["muscle"].append(muscle.std())
+        stds[modality]["edema"].append(edema.std())
+        stds[modality]["scar"].append(scar.std())
+        
+        probs["blood"].append(len(blood)/N)
+        probs["muscle"].append(len(muscle)/N)
+        probs["edema"].append(len(edema)/N)
+        probs["scar"].append(len(scar)/N)
+        
+
+
+mu=np.zeros((4,3))
+for cl,i in zip(classes, range(4)):
+    for modality,j in zip(modalities, range(3)):
+        mu[i,j]=np.mean(means[modality][cl])
     
+np.save(os.path.join(data_folder, 'mu_data.npy'), mu)
+
+sigma=np.zeros((4,3))
+for cl,i in zip(classes, range(4)):
+    for modality,j in zip(modalities, range(3)):
+        sigma[i,j]=np.mean(stds[modality][cl])
+    
+np.save(os.path.join(data_folder, 'sigma_data.npy'), sigma)
+
+pi=np.zeros(4)
+for cl,i in zip(classes, range(4)):
+    pi[i]=np.mean(probs[cl])
+    
+np.save(os.path.join(data_folder, 'pi_data.npy'), pi)
+
+
 print("Data prepared!")
 
 
