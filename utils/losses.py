@@ -174,6 +174,33 @@ class DiceLoss(torch.nn.Module):
         return loss / sum(self.weights)
 
 
+class DiceMetric(torch.nn.Module):
+    """
+    Dice metric function for training a multi class segmentation network.
+    The prediction of the network should be of type softmax(...) and the target should be one-hot encoded.
+    """
+
+    def __init__(self, **kwargs):
+        super(DiceMetric, self).__init__()
+    def forward(self, prediction, target):
+        bs = prediction.size(0)
+        cl = prediction.size(1)
+        p = prediction.view(bs,cl, -1)
+        t = target.view(bs,cl, -1)
+
+        intersection = (p * t).sum(2)
+        total = (p+t).sum(2)
+        
+        dice_coeff=torch.zeros(bs, cl)
+        for i in range(bs):
+            for j in range(cl):
+                if total[i,j] == 0:
+                    dice_coeff[i,j]=1
+                else:
+                   dice_coeff[i,j]=((2 * intersection[i,j]) / (total[i,j] )) 
+        dice_coeff= torch.mean(dice_coeff,0)
+        return dice_coeff[1:]
+
 def get_loss(crit="NormalGMM", **kwargs):
     if crit == "dice":
         return DiceLoss()

@@ -13,6 +13,14 @@ from sklearn.mixture import GaussianMixture as GMM
 #import yaml
 import os
 import torch
+import logging
+import sys
+import yaml
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import matplotlib.patches as mpatches
+
+from utils.unet import UNet2D
 
 
 class SVGMM():
@@ -119,88 +127,39 @@ def prepare_data(path_to_data):
     return X, gt, mask_heart
 
 
-
-def NLL_V(predictions, inputs, heart):
-    (K,X,Y)=predictions.shape
-    M=inputs.shape[0]
-    
-    pred = []
-    for cl in range(K):
-        pred.append(predictions[cl,...][heart==1])
-    pred = np.stack(pred,0)
-        
-    inp=[]
-    for ch in range(M):
-        inp.append(inputs[ch,...][heart==1])
-    inp = np.stack(inp,0)
-        
-    mu=np.zeros((K,M))
-    var=np.zeros((K,M))
+def NLL(X, mu, var, pi):
+    K,M = mu.shape
+    temp=np.zeros((K,M,X.shape[0]))
     for k in range(K):
         for m in range(M):
-            if np.sum(pred[k,...]) != 0:
-                mu[k,m]=np.sum(pred[k,...]*inp[m,...])/np.sum(pred[k,...])
-                var[k,m]=(np.sum(pred[k,...]*(inp[m,...]-mu[k,m])**2)/(np.sum(pred[k,...])))
-    temp=np.zeros((K,M,inp.shape[1]))
-    for k in range(K):
-        for m in range(M):
-            if np.sum(pred[k,...]) != 0:
-                temp[k,m,...]=(1/(np.sqrt(2*np.pi*var[k,m])))*np.exp(-((inp[m,...]-mu[k,m])**2/(2*var[k,m])))
+            temp[k,m,:]=(1/(np.sqrt(2*np.pi*var[k,m])))*np.exp(-((X[:,m]-mu[k,m])**2/(2*var[k,m])))
     temp =  np.prod(temp,1)
-    temp= pred * temp
-    likelyloss = -np.mean(np.log(np.sum(temp,axis=0)))
-    return likelyloss
-
-
-
-def NLL(predictions, inputs, heart):
-    (K,X,Y)=predictions.shape
-    M=inputs.shape[0]
+    temp = pi[:,np.newaxis] *temp
+    nll = -np.mean(np.log(np.sum(temp,axis=0)))
+    return nll
     
-    pred = []
-    for cl in range(K):
-        pred.append(predictions[cl,...][heart==1])
-    pred = np.stack(pred,0)
-        
-    inp=[]
-    for ch in range(M):
-        inp.append(inputs[ch,...][heart==1])
-    inp = np.stack(inp,0)
-        
-    mu=np.zeros((K,M))
-    var=np.zeros((K,M))
-    alpha = np.mean(pred,1)
+
+def NLL_V(X, mu, var, weights):
+    K,M = mu.shape
+    temp=np.zeros((K,M,X.shape[0]))
     for k in range(K):
         for m in range(M):
-            if np.sum(pred[k,...]) != 0:
-                mu[k,m]=np.sum(pred[k,...]*inp[m,...])/(np.sum(pred[k,...]))
-                var[k,m]=(np.sum(pred[k,...]*(inp[m,...]-mu[k,m])**2)/(np.sum(pred[k,...])))
-    temp=np.zeros((K,M,inp.shape[1]))
-    for k in range(K):
-        for m in range(M):
-            temp[k,m,...]=(1/(np.sqrt(2*np.pi*var[k,m])))*np.exp(-((inp[m,...]-mu[k,m])**2/(2*var[k,m])))
+            temp[k,m,:]=(1/(np.sqrt(2*np.pi*var[k,m])))*np.exp(-((X[:,m]-mu[k,m])**2/(2*var[k,m])))
     temp =  np.prod(temp,1)
-    temp = alpha[:,np.newaxis] *temp
-    likelyloss = -np.mean(np.log(np.sum(temp,axis=0)))
-    return likelyloss
-
-# def load_2dnet(path, device):
-#     params= yaml.load(open(path + "/config.json", 'r'), Loader=yaml.SafeLoader)['network']
-#     weights = torch.load(path + f"/weights.pth",  map_location=torch.device(device))
-#     net2d = get_network(architecture='unet2d', device=device, **params)
-#     net2d.load_state_dict(weights)
-#     net2d.eval()
-#     return net2d
+    temp = weights.T *temp
+    nll = -np.mean(np.log(np.sum(temp,axis=0)))
+    return nll
 
 
-# def load_2dnet_single(path, device):
-#     path_params = path[0:-13]+"config.json"
-#     params= yaml.load(open(path_params, 'r'), Loader=yaml.SafeLoader)['network']
-#     weights = torch.load(path,  map_location=torch.device(device))
-#     net2d = get_network(architecture='unet2d', device=device, **params)
-#     net2d.load_state_dict(weights)
-#     net2d.eval()
-#     return net2d
+def load_2dnet(path, device):
+    params= yaml.load(open(path + "/config.json", 'r'), Loader=yaml.SafeLoader)['network']
+    weights = torch.load(path + "/weights.pth",  map_location=torch.device(device))
+    net2d = UNet2D(**params).to(device)         
+    net2d.load_state_dict(weights)
+    net2d.eval()
+    return net2d
+
+
 
 def dicecoeff(prediction, target):
     intersection = np.sum(prediction * target)
@@ -266,17 +225,57 @@ def order_dice(pred, gt):
     return ordered
         
 
-def save_checkpoint(net, checkpoint_dir, fold, name="weights", savepath=False, z_dim=False):
+def save_checkpoint(net, checkpoint_dir, name="weights"):
     checkpoint_path = os.path.join(checkpoint_dir, f"{name}.pth")
     torch.save(net.state_dict(), checkpoint_path)
-    if savepath:
-        if not os.path.exists('paths/'):
-            os.makedirs('paths/')
-        if z_dim==True:
-            with open(f"paths/best_weights3d_{fold}.txt", "w") as text_file:
-                text_file.write(checkpoint_dir+"/")
-        else:
-            with open(f"paths/best_weights2d_{fold}.txt", "w") as text_file:
-                text_file.write(checkpoint_dir+"/")
+    
                 
-                
+def get_logger(name, level=logging.INFO, formatter = '%(asctime)s [%(threadName)s] %(levelname)s %(name)s - %(message)s'):
+    logger = logging.getLogger(name)
+    if not logger.hasHandlers():
+        logger.setLevel(level)
+        # Logging to console
+        stream_handler = logging.StreamHandler(sys.stdout)
+        formatter = logging.Formatter(formatter)
+        stream_handler.setFormatter(formatter)
+        logger.addHandler(stream_handler)
+        logger.handler_set = True
+    return logger
+
+
+def plot_result(X, pred, gt, savepath, file):
+    cmap = cm.get_cmap("jet").copy()
+    cmap.set_bad(color='black')
+    classes= ["blood", "muscle", "edema", "scar"]
+    values = [1,2,3,4]
+    plt.figure()
+    plt.subplot(1,5,1)
+    plt.imshow(X[2,...], cmap = "gray")
+    plt.axis("off")
+    plt.title("bSSFP", fontsize = 11)
+    plt.subplot(1,5,2)
+    plt.imshow(X[1,...], cmap = "gray")
+    plt.axis("off")
+    plt.title("T2")
+    plt.subplot(1,5,3)
+    plt.imshow(X[0,...], cmap = "gray")
+    plt.axis("off")
+    plt.title("LGE",fontsize = 11)
+    
+    
+    plt.subplot(1,5,4)
+    pred_masked = np.ma.masked_where(pred ==0, pred)
+    plt.imshow(pred_masked, interpolation="none", vmin=0, vmax=4, cmap = cmap)
+    plt.axis("off")
+    plt.title("Prediction",fontsize = 11)
+    
+    plt.subplot(1,5,5)
+    masked_gt = np.ma.masked_where(gt ==0, gt)
+    im=plt.imshow(masked_gt, interpolation="none", vmin=0, vmax=4, cmap = cmap)
+    colors = [ im.cmap(im.norm(value)) for value in values]
+    patches = [ mpatches.Patch(color=colors[i], label=classes[i].format(l=values[i]) ) for i in range(len(values)) ]
+    plt.legend(handles=patches, bbox_to_anchor=(0.7, 1.03), loc=2,fontsize=5 )
+    plt.axis("off")
+    plt.title("Ground truth",fontsize = 11)
+    plt.savefig(os.path.join(savepath,f"{file}.png"), bbox_inches='tight', dpi=300)
+    plt.close()
