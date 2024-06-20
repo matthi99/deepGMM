@@ -48,7 +48,7 @@ The preprocessed data will be saved as numpy files in the `DATA` folder of the r
 
 To apply the proposed methods deepG and deepSVG to the multi-sequence MRI images of the MyoPS Dataset run
 ```
-python deepG.py --type 'TYPE' --lam XXX --tol XXX --max_epochs XXX
+python deepG.py --type "TYPE" --lam XXX --tol XXX --max_epochs XXX
 ``` 
 - `--type` specifies which Gaussian mixture model (GMM) should be used. You can decide between the classical GMM (deepG) and the spacially variant GMM (deepSVG). Default setting is `deepG`. 
 - `--lam` specifies the regularization parameter (`default=0`) for the regularizing function $r(\mathbb{\mu})$ described in the paper. 
@@ -59,11 +59,16 @@ Predicted segmentation masks and results compared to the ground truth will be sa
 
 ### Training deepG on multiple images
 
-To train the Error correcting 2D-3D cascaded framework run the command
+To train a deep Gaussian mixture model on multiple images of the dataset run
 ```
-python deepG.py --wave 'WAVELET' --levels XXX --s2n-ratio XXX --N_epochs XXX
+python deepG_train.py --type "TYPE" --lam XXX --tol XXX --max_epochs XXX
 ``` 
-Note that to be able to train the cascade the 2D U-Net had to be trained beforehand. 
+The network will be trained on images of 20 patients following the same data split as in the paper. After training the performance on a test dataset of 5 patients can be obtained by running
+```
+python deepG_pred.py --type "TYPE" --lam XXX --tol XXX --max_epochs XXX
+``` 
+Segmentation masks and results compared to the ground truth again will be saved in the `RESULTS_FOLDER`
+
 
 ## Testing
 
