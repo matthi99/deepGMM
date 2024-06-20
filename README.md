@@ -46,18 +46,22 @@ The preprocessed data will be saved as numpy files in the `DATA` folder of the r
 
 ### deepG for single images
 
-To train the two dimensional U-Nets run the command
+To apply the proposed methods deepG and deepSVG to the multi-sequence MRI images of the MyoPS Dataset run
 ```
-python 2d-net.py DATASET_NAME FOLD 
+python deepG.py --type 'TYPE' --lam XXX --tol XXX --max_epochs XXX
 ``` 
-- `FOLD` specifies on which on which od the five folds (0,1,2,3,4) the network should be trained.  
-- Trained networks and training progress will get saved in a folder called `RESULTS_FOLDER` located in the `DATA_FOLDER` directory. 
+- `--type` specifies which Gaussian mixture model (GMM) should be used. You can decide between the classical GMM (deepG) and the spacially variant GMM (deepSVG). Default setting is `deepG`. 
+- `--lam` specifies the regularization parameter (`default=0`) for the regularizing function $r(\mathbb{\mu})$ described in the paper. 
+- `--tol` defines the stopping criteria. If the negative log-likelihood (NLL) change per iteration gets smaller than `tol` the algorithm is stopped. (`default=0.001`).  
+- `--max_epochs` defines for how many epochs the networks should be trained maximally (`default=200`)
 
-### 2D-3D cascade
+Predicted segmentation masks and results compared to the ground truth will be saved in the `RESULTS_FOLDER`
+
+### Training deepG on multiple images
 
 To train the Error correcting 2D-3D cascaded framework run the command
 ```
-python 3d-cascade.py DATASET_NAME FOLD 
+python deepG.py --wave 'WAVELET' --levels XXX --s2n-ratio XXX --N_epochs XXX
 ``` 
 Note that to be able to train the cascade the 2D U-Net had to be trained beforehand. 
 
