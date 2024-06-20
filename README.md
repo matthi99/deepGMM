@@ -1,6 +1,6 @@
 # Deep Gaussian mixture model for unsupervised image segmentation
 
-This repository is created for learning non-linear regularizing filters for inverting the Radon transform. For more detail about non-linear regularizing filters see:
+This repository is created for unsupervised segmentation of multi-sequence MR images by combining Gaussian mixture models and deep learning techniques. For more detail about non-linear regularizing filters see:
 
 ```
 Schwab, M., Mayr, A., & Haltmeier, M. (2024). Deep Gaussian mixture model for unsupervised image segmentation. arXiv preprint arXiv:2404.12252.
@@ -24,7 +24,7 @@ conda activate deepG
 # Usage
 
 ## Preprocessing
-1. Download the [MyoPS Dataset](https://mega.nz/folder/BRdnDISQ#FnCg9ykPlTWYe5hrRZxi-w) and save it in a new folder called `DATA`. After download the folder structure should look like this:
+1. Download the [MyoPS Dataset](https://mega.nz/folder/BRdnDISQ#FnCg9ykPlTWYe5hrRZxi-w) and save it in a folder called `DATA`. After download the folder structure should look like this:
 ``` 
 DATA/
 ├── MyoPS 2020 Dataset 
@@ -34,13 +34,13 @@ DATA/
     ├── MyoPS2020_EvaluateByYouself
 
 ```
-Note that for the experiments of the paper only the folders train and train25_myops_gd are necessary. The other folders are optional and don't have to be present.
+Note that for the experiments of the paper only the folders `train` and `train25_myops_gd` are necessary. The other folders are optional and don't have to be present.
 
 2. Prepare the downloaded dataset for the segmentation task. For this run the following command in your console
 ```
 python preprocessing.py 
 ``` 
-The preprocessed data will be saved as numpy files in the `DATA` folder of the repository.  
+The preprocessed data will be saved as numpy files in `DATA/preprocessed/myops_2d`.  
 
 ## Train deep Gaussian mixture models (deepG)
 
@@ -50,7 +50,7 @@ To apply the proposed methods deepG and deepSVG to the multi-sequence MRI images
 ```
 python deepG.py --type "TYPE" --lam XXX --tol XXX --max_epochs XXX
 ``` 
-- `--type` specifies which Gaussian mixture model (GMM) should be used. You can decide between the classical GMM (deepG) and the spacially variant GMM (deepSVG). Default setting is `deepG`. 
+- `--type` specifies which Gaussian mixture model (GMM) should be used. You can decide between the classical GMM ("deepG") and the spacially variant GMM ("deepSVG"). Default setting is "deepG". 
 - `--lam` specifies the regularization parameter (`default=0`) for the regularizing function $r(\bm{\mu})$ described in the paper. 
 - `--tol` defines the stopping criteria. If the negative log-likelihood (NLL) change per iteration gets smaller than `tol` the algorithm is stopped. (`default=0.001`).  
 - `--max_epochs` defines for how many epochs the networks should be trained maximally (`default=200`)
@@ -96,5 +96,5 @@ Matthias Schwab<sup>1</sup>, Agnes Mayr <sup>1</sup>, Markus Haltmeier <sup>2</s
 
 <sup>2</sup> Department of Mathematics, University of Innsbruck, Technikerstrasse 13, 6020 Innsbruck, Austria
 
-
+This work was supported by the Austrian Science Fund (FWF) [grant number DOC 110].
 
