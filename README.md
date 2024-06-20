@@ -1,9 +1,9 @@
 # Deep Gaussian mixture model for unsupervised image segmentation
 
-This repository is created for the publication:
+This repository is created for learning non-linear regularizing filters for inverting the Radon transform. For more detail about non-linear regularizing filters see:
 
 ```
-Schwab, M., Pamminger, M., Kremser, C., Obmann, D., Haltmeier, M., Mayr, A. (2023). Error correcting 2D-3D cascaded network for myocardial infarct scar segmentation on late gadolinium enhancement cardiac magnetic resonance images. Best Journal you can imagine, 62, 66-83.
+Schwab, M., Mayr, A., & Haltmeier, M. (2024). Deep Gaussian mixture model for unsupervised image segmentation. arXiv preprint arXiv:2404.12252.
 ```
 
 
@@ -11,37 +11,40 @@ Schwab, M., Pamminger, M., Kremser, C., Obmann, D., Haltmeier, M., Mayr, A. (202
 
 1. Clone the git repository. 
 ```
-git clone https://git.uibk.ac.at/c7021123/EcorC.git
+git clone https://git.uibk.ac.at/c7021123/deepGMM.git
 ``` 
 
 2. Intall and activate the virtual environment.
 ```
-cd EcorC
-conda env create -f env_lge.yml
-conda activate env_lge
+cd deepGMM
+conda env create -f env_deepG.yml
+conda activate deepG
 ``` 
 
 # Usage
 
 ## Preprocessing
-1. Download the [EMIDEC Dataset](https://emidec.com/dataset#download) and/or the [MyoPS Dataset](https://mega.nz/folder/BRdnDISQ#FnCg9ykPlTWYe5hrRZxi-w). If you downloaded both datasets the folder structure in your `DATA_FOLDER` should look like this 
+1. Download the [MyoPS Dataset](https://mega.nz/folder/BRdnDISQ#FnCg9ykPlTWYe5hrRZxi-w) and save it in a new folder called `DATA`. After download the folder structure should look like this:
 ``` 
-DATA_FOLDER/
-├── emidec-dataset-1.0.1 
-├── emidec-segmentation-testset-1.0.0
-├── MyoPS 2020 Dataset
-```
-Note that for training the emidec-segmentation-testset folder is optional and does not have to be present.
+DATA/
+├── MyoPS 2020 Dataset 
+    ├── train25
+    ├── train25_myops_gd
+    ├── test20
+    ├── MyoPS2020_EvaluateByYouself
 
-2. Prepare the downloaded dataset for training. For this run the following command in your console
 ```
-python preprocessing.py DATASET_NAME PATH_TO_DATA_FOLDER
+Note that for the experiments of the paper only the folders train and train25_myops_gd are necessary. The other folders are optional and don't have to be present.
+
+2. Prepare the downloaded dataset for the segmentation task. For this run the following command in your console
+```
+python preprocessing.py 
 ``` 
-- `DATASET_NAME` specifies which datset should be preprocessed. Possible arguments are `EMIDEC` or `MyoPS`. 
+The preprocessed data will be saved as numpy files in the `DATA` folder of the repository.  
 
-## Training
+## Train deep Gaussian mixture models (deepG)
 
-### 2D U-Net
+### deepG for single images
 
 To train the two dimensional U-Nets run the command
 ```
