@@ -70,19 +70,27 @@ python deepG_pred.py --type "TYPE" --lam XXX --tol XXX --max_epochs XXX
 Segmentation masks and results compared to the ground truth again will be saved in the `RESULTS_FOLDER`
 
 
-## Testing
+## Comarison with EM-algorithm
 
-To test the final framework on the testsets of the correspond of the EMICED callenge run 
+To compare the results of the proposed method with conventional NLL estimation via the EM-algorithm you can run
 ```
-python inference.py DATASET_NAME
+python EM_GMM.py --mu_data T/F --tol XXX --tol XXX --max_iter XXX
 
 ```
-- Note that inference will be done with all 5 folds from the cross-validation as an ensemble. Thus, 2D and 3D cascade must have been trained on all 5 folds prior to running inference.   
-- Predictions and plots of the results will be saved in `RESULTS_FOLDER/DATASET_NAME/inference`.
+or 
+```
+python EM_SVGMM.py --mu_data T/F --tol XXX --tol XXX --max_iter XXX
+
+```
+- `--mu_data` specifies if $\mathbb{\mu}_{\textit{data}}$ shoulöd be used as initalization for parameter $\textbf{\mu}$ (`default=False`).
+- `--tol` defines the stopping criteria. If the negative log-likelihood (NLL) improvement per iteration gets smaller than `tol` the algorithm is stopped. (`default=0.001`).  
+- `--max_iter` defines maximal number of EM-iterations that are performed (`default=100`).
+
+Predicted segmentation masks and results compared to the ground truth will be saved in the `RESULTS_FOLDER`
 
 
 ## Authors and acknowledgment
-Matthias Schwab<sup>1</sup>, Mathias Pamminger<sup>1</sup>, Christian Kremser <sup>1</sup>, Daniel Obmann <sup>2</sup>, Markus Haltmeier <sup>2</sup>, Agnes Mayr <sup>1</sup>
+Matthias Schwab<sup>1</sup>, Agnes Mayr <sup>1</sup>, Markus Haltmeier <sup>2</sup>
 
 <sup>1</sup> University Hospital for Radiology, Medical University Innsbruck, Anichstraße 35, 6020 Innsbruck, Austria 
 
