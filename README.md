@@ -26,8 +26,8 @@ conda activate deepG
 ## Preprocessing
 1. Download the [MyoPS Dataset](https://mega.nz/folder/BRdnDISQ#FnCg9ykPlTWYe5hrRZxi-w) and save it in a folder called `DATA`. After download the folder structure should look like this:
 ``` 
-DATA/
-├── MyoPS 2020 Dataset 
+DATA
+├── MyoPS 2020 Dataset
     ├── train25
     ├── train25_myops_gd
     ├── test20
