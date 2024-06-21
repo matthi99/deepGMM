@@ -1,6 +1,6 @@
 # Deep Gaussian mixture model for unsupervised image segmentation
 
-This repository is created for unsupervised segmentation of multi-sequence MR images by combining Gaussian mixture models and deep learning techniques. For more detail about non-linear regularizing filters see:
+This repository is created for unsupervised segmentation of multi-sequence MR images by combining Gaussian mixture models and deep learning techniques. For more details see:
 
 ```
 Schwab, M., Mayr, A., & Haltmeier, M. (2024). Deep Gaussian mixture model for unsupervised image segmentation. arXiv preprint arXiv:2404.12252.
@@ -40,7 +40,7 @@ Note that for the experiments of the paper only the folders `train` and `train25
 ```
 python preprocessing.py 
 ``` 
-The preprocessed data will be saved as numpy files in `DATA/preprocessed/myops_2d`.  
+The preprocessed data will be saved as numpy files in `DATA/preprocessed/myops_2d/`.  
 
 ## Train deep Gaussian mixture models (deepG)
 
@@ -53,7 +53,7 @@ python deepG.py --type "TYPE" --lam XXX --tol XXX --max_epochs XXX
 - `--type` specifies which Gaussian mixture model (GMM) should be used. You can decide between the classical GMM ("deepG") and the spacially variant GMM ("deepSVG"). Default setting is "deepG". 
 - `--lam` specifies the regularization parameter (`default=0`) for the regularizing function $r(\bm{\mu})$ described in the paper. 
 - `--tol` defines the stopping criteria. If the negative log-likelihood (NLL) change per iteration gets smaller than `tol` the algorithm is stopped. (`default=0.001`).  
-- `--max_epochs` defines for how many epochs the networks should be trained maximally (`default=200`)
+- `--max_epochs` defines for how many epochs the networks should be trained maximally (`default=200`).
 
 Predicted segmentation masks and results compared to the ground truth will be saved in the `RESULTS_FOLDER`
 
@@ -72,7 +72,7 @@ Segmentation masks and results compared to the ground truth again will be saved 
 
 ## Comarison with EM-algorithm
 
-To compare the results of the proposed method with conventional NLL estimation via the EM-algorithm you can run
+To compare the results of the proposed method with conventional NLL estimation with the EM-algorithm you can run
 ```
 python EM_GMM.py --mu_data T/F --tol XXX --tol XXX --max_iter XXX
 
@@ -82,8 +82,8 @@ or
 python EM_SVGMM.py --mu_data T/F --tol XXX --tol XXX --max_iter XXX
 
 ```
-- `--mu_data` specifies if $\bm{\mu}_{\text{data}}$ should be used as initalization for parameter $\bm{\mu}$ (`default=False`).
-- `--tol` defines the stopping criteria. If the negative log-likelihood (NLL) improvement per iteration gets smaller than `tol` the algorithm is stopped. (`default=0.001`).  
+- `--mu_data` specifies if $\bm{\mu}_{\text{data}}$ should be used as initalization for the parameter $\bm{\mu}$ (`default=False`).
+- `--tol` defines the stopping criteria. If the negative log-likelihood (NLL) improvement per iteration gets smaller than `tol` the algorithm is stopped (`default=0.001`).  
 - `--max_iter` defines maximal number of EM-iterations that are performed (`default=100`).
 
 Predicted segmentation masks and results compared to the ground truth will be saved in the `RESULTS_FOLDER`
