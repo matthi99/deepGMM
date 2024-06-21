@@ -34,9 +34,9 @@ DATA
     ├── MyoPS2020_EvaluateByYouself
 
 ```
-Note that for the experiments of the paper only the folders `train` and `train25_myops_gd` are necessary. The other folders are optional and don't have to be present.
+Note that for the experiments of the paper only the folders `train25` and `train25_myops_gd` are necessary. The other folders are optional and don't have to be present.
 
-2. Prepare the downloaded dataset for the segmentation task. For this run the following command in your console
+2. Prepare the downloaded dataset for the segmentation task. For this run the following command in your console:
 ```
 python preprocessing.py 
 ``` 
@@ -46,7 +46,7 @@ The preprocessed data will be saved as numpy files in `DATA/preprocessed/myops_2
 
 ### deepG for single images
 
-To apply the proposed methods deepG and deepSVG to the multi-sequence MRI images of the MyoPS Dataset run
+To apply the proposed methods deepG and deepSVG to the multi-sequence MR images of the MyoPS Dataset run
 ```
 python deepG.py --type "TYPE" --lam XXX --tol XXX --max_epochs XXX
 ``` 
@@ -55,7 +55,7 @@ python deepG.py --type "TYPE" --lam XXX --tol XXX --max_epochs XXX
 - `--tol` defines the stopping criteria. If the negative log-likelihood (NLL) change per iteration gets smaller than `tol` the algorithm is stopped. (`default=0.001`).  
 - `--max_epochs` defines for how many epochs the networks should be trained maximally (`default=200`).
 
-Predicted segmentation masks and results compared to the ground truth will be saved in the `RESULTS_FOLDER`
+Predicted segmentation masks and results compared to the ground truth will be saved in the `RESULTS_FOLDER`.
 
 ### Training deepG on multiple images
 
@@ -67,26 +67,26 @@ The network will be trained on images of 20 patients following the same data spl
 ```
 python deepG_pred.py --type "TYPE" --lam XXX --tol XXX --max_epochs XXX
 ``` 
-Segmentation masks and results compared to the ground truth again will be saved in the `RESULTS_FOLDER`
+Segmentation masks and results compared to the ground truth again will be saved in the `RESULTS_FOLDER`.
 
 
 ## Comarison with EM-algorithm
 
 To compare the results of the proposed method with conventional NLL estimation with the EM-algorithm you can run
 ```
-python EM_GMM.py --mu_data T/F --tol XXX --tol XXX --max_iter XXX
+python EM_GMM.py --mu_data T/F --tol XXX --max_iter XXX
 
 ```
 or 
 ```
-python EM_SVGMM.py --mu_data T/F --tol XXX --tol XXX --max_iter XXX
+python EM_SVGMM.py --mu_data T/F --tol XXX --max_iter XXX
 
 ```
 - `--mu_data` specifies if $\bm{\mu}_{\text{data}}$ should be used as initalization for the parameter $\bm{\mu}$ (`default=False`).
-- `--tol` defines the stopping criteria. If the negative log-likelihood (NLL) improvement per iteration gets smaller than `tol` the algorithm is stopped (`default=0.001`).  
+- `--tol` defines the stopping criteria. If the NLL improvement per iteration gets smaller than `tol` the algorithm is stopped (`default=0.001`).  
 - `--max_iter` defines maximal number of EM-iterations that are performed (`default=100`).
 
-Predicted segmentation masks and results compared to the ground truth will be saved in the `RESULTS_FOLDER`
+Predicted segmentation masks and results compared to the ground truth will be saved in the `RESULTS_FOLDER`.
 
 
 ## Authors and acknowledgment
