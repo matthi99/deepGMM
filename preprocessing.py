@@ -9,14 +9,12 @@ import numpy as np
 import os
 from scipy import ndimage
 
-data_folder = "DATA"
 
-#3d data
+
+#folders and filelists
+data_folder = "DATA"
 train_folder= os.path.join(data_folder, 'MyoPS 2020 Dataset/')
 preprocessed_folder= os.path.join(data_folder, 'preprocessed')
-if not os.path.exists(preprocessed_folder):
-    os.makedirs(preprocessed_folder)
-    
 save_folder= os.path.join(preprocessed_folder, 'myops_2d/')
 if not os.path.exists(save_folder):
     os.makedirs(save_folder)
@@ -28,7 +26,8 @@ files_gt=[train_gt+f for f in os.listdir(train_gt)]
 files_LGE=[train_img+f for f in os.listdir(train_img) if f.endswith("DE.nii.gz")]
 files_T2=[train_img+f for f in os.listdir(train_img) if f.endswith("T2.nii.gz")]
 files_C0=[train_img+f for f in os.listdir(train_img) if f.endswith("C0.nii.gz")]
-    
+
+#prepare data    
 for gt, im_LGE, im_T2, im_C0 in zip(files_gt, files_LGE, files_T2, files_C0):
     data={}
     #load images
@@ -71,6 +70,8 @@ for gt, im_LGE, im_T2, im_C0 in zip(files_gt, files_LGE, files_T2, files_C0):
 
     masks=np.concatenate((bg[...,None], blood[...,None], muscle[...,None], edema[...,None], scar[...,None]), axis=3)
     data['masks']=masks
+    
+    #save images slice py slice
     L=data['LGE'].shape[0]
     for i in range(L):
         data2d={}
@@ -80,27 +81,27 @@ for gt, im_LGE, im_T2, im_C0 in zip(files_gt, files_LGE, files_T2, files_C0):
         data2d['C0']=data['C0'][i,...]
         data2d['masks']=data['masks'][i,...]
         temp = np.argmax(data['masks'][i,...],-1)
+        #only save images with were all classes occur
         if (len(np.unique(temp)))==5:
             np.save(os.path.join(save_folder, "Case_"+patient_nr+'_'+str(i)+'.npy'), data2d)
                       
 
 # Get Mu_data for regularization
-
 folder = "DATA/preprocessed/myops_2d/"
 files= os.listdir(folder)
 
+#choose 10 random images
 np.random.seed(42)
 np.random.shuffle(files)
 files = files[0:10]
 
-
 modalities = ["LGE", "T2", "C0"]
 classes = ["blood", "muscle", "edema", "scar"]
-
 
 means={}
 probs={}
 stds={}
+#calculate means, covariances and wheights
 for modality in modalities:
     means[modality]={}
     stds[modality]={}
@@ -138,29 +139,23 @@ for modality in modalities:
         probs["muscle"].append(len(muscle)/N)
         probs["edema"].append(len(edema)/N)
         probs["scar"].append(len(scar)/N)
-        
-
 
 mu=np.zeros((4,3))
 for cl,i in zip(classes, range(4)):
     for modality,j in zip(modalities, range(3)):
-        mu[i,j]=np.mean(means[modality][cl])
-    
+        mu[i,j]=np.mean(means[modality][cl])    
 np.save(os.path.join(data_folder, 'mu_data.npy'), mu)
 
 sigma=np.zeros((4,3))
 for cl,i in zip(classes, range(4)):
     for modality,j in zip(modalities, range(3)):
-        sigma[i,j]=np.mean(stds[modality][cl])
-    
+        sigma[i,j]=np.mean(stds[modality][cl])    
 np.save(os.path.join(data_folder, 'sigma_data.npy'), sigma)
 
 pi=np.zeros(4)
 for cl,i in zip(classes, range(4)):
-    pi[i]=np.mean(probs[cl])
-    
+    pi[i]=np.mean(probs[cl])    
 np.save(os.path.join(data_folder, 'pi_data.npy'), pi)
-
 
 print("Data prepared!")
 

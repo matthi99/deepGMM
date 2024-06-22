@@ -13,15 +13,12 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 
-
 from utils.config import Config
 from utils.unet import UNet2D
 from utils.dataloader import CardioDataset, CardioCollatorMulticlass
 from utils.utils import save_checkpoint, get_logger
 from utils.losses import get_loss, DiceMetric
 
-
-#test
 
 #Define parameters for training 
 parser = argparse.ArgumentParser(description='Define hyperparameters for training.')
@@ -33,7 +30,7 @@ parser.add_argument('--lam',type = float, help = "Regularization parameter",  de
 parser.add_argument('--tol',type = float, help = "Tolerance for stopping criteria",  default = 0.005)
 args = parser.parse_args()
 
-
+#CNN configurations
 config = {
     "network":{
         "activation": "leakyrelu",
@@ -49,26 +46,24 @@ config = {
     "classes": ["blood", "muscle", "edema", "scar"],
 }
 
+#create RESULTS_FOLDER and specify losses
 reg_loss = get_loss(crit="mu_data") 
-#create save folders if they dont exist already
+
 if args.type == "deepG":
     main_loss = get_loss(crit="NormalGMM") 
     savefolder = f"RESULTS_FOLDER/deepG/multiple_images/lam={args.lam}/"
-    
-        
 elif args.type == "deepSVG":
     main_loss = get_loss(crit="VariantGMM") 
     savefolder = f"RESULTS_FOLDER/deepSVG/multiple_images/lam={args.lam}/"
 else:
     print("Wrong type specified")
 
-
 if not os.path.exists(savefolder):
     os.makedirs(os.path.join(savefolder,"predictions"))
     os.makedirs(os.path.join(savefolder,"plots"))
 
 
-#define logger and get network configs
+#define logger and training setup
 logger= get_logger(savefolder)
 FileOutputHandler = logging.FileHandler(savefolder+"logs.log")
 logger.addHandler(FileOutputHandler)
@@ -82,16 +77,11 @@ setup_val=Config.val_data_setup
 setup_train['patients']=Config.train_patients
 setup_val['patients']=Config.val_patients
 
-
-#get dataloaders     
+#get dataloader  
 cd_train = CardioDataset(folder="DATA/preprocessed/myops_2d/" ,z_dim=False,  **setup_train)
-cd_val = CardioDataset(folder="DATA/preprocessed/myops_2d/"  ,z_dim=False, validation=True, **setup_val)    
 collator = CardioCollatorMulticlass(classes=("bg", "blood","muscle", "edema", "scar"))
 dataloader_train = torch.utils.data.DataLoader(cd_train, batch_size=args.batchsize, collate_fn=collator,
                                                         shuffle=True)    
-dataloader_eval = torch.utils.data.DataLoader(cd_val, batch_size=args.batchsize, collate_fn=collator,
-                                                        shuffle=False)
-
 
 #get network, optimizer, loss, metric and histogramm    
 net = UNet2D(**config["network"]).to(device)                                        
@@ -99,16 +89,13 @@ opt = torch.optim.AdamW(net.parameters(), weight_decay=1e-3,lr=1e-3)
 lambda1 = lambda epoch: (1-epoch/args.max_epochs)**0.9
 scheduler = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda=lambda1)
     
-
 histogramm ={}
 histogramm["NLL"]=[]
 histogramm["reg_loss"]=[]
 histogramm["dice"]=[]
     
-
 #train
 for epoch in range(args.max_epochs):
-    #torch.cuda.empty_cache()
     net.train()
     logger.info(f"Epoch {epoch}\{args.max_epochs}-------------------------------")
     steps = 0
@@ -134,7 +121,7 @@ for epoch in range(args.max_epochs):
     
     for key in histogramm.keys():
         histogramm[key][-1] /= steps
-    
+    #save if stopping criteria is satisfied
     if epoch > args.min_epochs:
         change = (histogramm["NLL"][-2]-histogramm["NLL"][-1])
         if abs(change) < args.tol:
@@ -144,7 +131,7 @@ for epoch in range(args.max_epochs):
     scheduler.step()
     
     
-#plot training progress
+#save training progress
 plt.figure()
 plt.subplot(1,3,1)
 plt.plot(histogramm["NLL"])

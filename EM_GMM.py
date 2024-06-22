@@ -18,6 +18,7 @@ from utils.utils import prepare_data, NLL, order_dice, dicecoeff, plot_result
 parser = argparse.ArgumentParser(description='Define hyperparameters for predictions.')
 parser.add_argument('--mu_data', type=bool, default=False)
 parser.add_argument('--tol', type=float, default=0.0002)
+parser.add_argument('--max_iter', type=float, default=100)
 parser.add_argument('--patients', nargs='+', type=float, default= [i for i in range(101,126)])
 parser.add_argument('--random_state', type = int, default = 33)
 args = parser.parse_args()
@@ -40,18 +41,17 @@ if not os.path.exists(savefolder):
     os.makedirs(os.path.join(savefolder,"plots"))
     os.makedirs(os.path.join(savefolder,"predictions"))
 
+#create results dictionary and filelist
 results= {}
-classes= ["blood", "muscle", "edema", "scar"]
-    
+classes= ["blood", "muscle", "edema", "scar"]    
 files=[]
 for patient in patients:
     files.append([os.path.join(FOLDER,f) for f in os.listdir(FOLDER) if f.startswith(patient)])
-    
 files= sum(files, [])
 
 #Segmentation with GMM
 for file in files:
-    #GMM
+    #prepare data
     X, gt, mask_heart = prepare_data(file)
     patient = file.split("/")[-1][0:-4]
     results[patient]={}
@@ -59,10 +59,11 @@ for file in files:
     T2 = X[1,...][mask_heart==1]
     C0 = X[2,...][mask_heart==1]
     in_gmm=np.stack((LGE,T2,C0), axis=1)
+    #EM-algorithm
     if mu_data == True:
-        gmm = GMM(n_components=4, covariance_type="diag", tol= tol, means_init = means_init, random_state=random_state)
+        gmm = GMM(n_components=4, covariance_type="diag", tol= tol, max_iter = args.max_iter, means_init = means_init, random_state=random_state)
     else:
-        gmm = GMM(n_components=4, covariance_type="diag", tol= tol, init_params= init_params, random_state=random_state)
+        gmm = GMM(n_components=4, covariance_type="diag", tol= tol, max_iter = args.max_iter, init_params= init_params, random_state=random_state)
     gmm.fit(in_gmm)
     nll = NLL(in_gmm, gmm.means_, gmm.covariances_, gmm.weights_)
     results[patient]["NLL"]=nll
@@ -73,19 +74,20 @@ for file in files:
     for i in range(4):
         pred[i][mask_heart==1]=probs[:,i]
     
+    #get labels to image and calculate results
     probs_gmm = pred.copy()
     pred = np.zeros_like(mask_heart)
     labels = gmm.predict(in_gmm)
     pred[mask_heart==1]=labels+1
     pred = order_dice(pred, gt)
-    
     for cl,i in zip(classes,range(1,5)):
         results[patient]["dice_"+cl] = dicecoeff((pred==i)*1, (gt==i)*1)
     
+    #save predictions and plots
     np.save(os.path.join(savefolder,"predictions", patient), pred)
-    
     plot_result(X, pred, gt, os.path.join(savefolder, "plots"), patient)
-    
+
+#save results
 with open(os.path.join(savefolder,'results.txt'), 'w') as f:
     json.dump(results, f, indent=4, sort_keys=False)
     

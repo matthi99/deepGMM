@@ -16,18 +16,18 @@ from utils.unet import UNet2D
 from utils.utils import save_checkpoint, prepare_data, plot_result, order_dice, dicecoeff
 from utils.losses import get_loss
 
-
-parser = argparse.ArgumentParser(description='Define hyperparameters for training.')
+#Define parameters
+parser = argparse.ArgumentParser(description='Define hyperparameters for predictions.')
 parser.add_argument('--max_epochs', type=int, default=200)
 parser.add_argument('--min_epochs', type=int, default=10)
 parser.add_argument('--type',type = str, help = "Type of Gaussian mixture model (deepG, deepSVG) ",  default = "deepSVG")
 parser.add_argument('--lam',type = float, help = "Regularization parameter",  default = 0)
 parser.add_argument('--tol',type = float, help = "Tolerance for stopping criteria",  default = 0.001)
-parser.add_argument('--patients', nargs='+', type=float, default= [i for i in range(101,126)])
-parser.add_argument('--save_nets',type = bool, help = "Should the neural networks get saved?",  default = False)
+parser.add_argument('--patients', nargs='+', type=float, help = "Patientnumbers of patients",default= [i for i in range(101,126)])
+parser.add_argument('--save_nets',type = bool, help = "Should the neural networks get saved? Could need a lot of memory",  default = False)
 args = parser.parse_args()
 
-
+#CNN configurations
 config = {
     "network":{
         "activation": "leakyrelu",
@@ -43,13 +43,13 @@ config = {
     "classes": ["blood", "muscle", "edema", "scar"],
 }
 
+#create results dictionary, RESULTS_FOLDER and specify losses 
 results= {}
 reg_loss = get_loss(crit="mu_data") 
 
 if args.type == "deepG":
     main_loss = get_loss(crit="NormalGMM") 
     savefolder = f"RESULTS_FOLDER/deepG/single_images/lam={args.lam}/"
-    
 elif args.type == "deepSVG":
     main_loss = get_loss(crit="VariantGMM") 
     savefolder = f"RESULTS_FOLDER/deepSVG/single_images/lam={args.lam}/"
@@ -63,16 +63,15 @@ if not os.path.exists(os.path.join(savefolder,"predictions")):
 
 
 json.dump(config, open(os.path.join(savefolder,"nets","config.json"), "w"))
-
-
 device= torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
 mu_data = torch.from_numpy(np.load("DATA/mu_data.npy").astype("float32")).to(device)
-
 patients = args.patients
+
+#start segmenting
 for patient in patients:
     files = [os.path.join("DATA/preprocessed/myops_2d",f) for f in os.listdir("DATA/preprocessed/myops_2d/") if int(f.split("_")[-2])==patient]
     for file in files:
+        #prepare images and CNN
         patient =file.split("\\")[-1][0:-4]
         print(patient)
         results[patient]={}
@@ -86,7 +85,7 @@ for patient in patients:
         mask_heart = torch.from_numpy(mask_heart.astype("float32")).to(device)
         mask_heart = mask_heart[None, None, ...]
         
-        #train
+        #train CNN
         nll.append(float('inf'))
         for epoch in range(args.max_epochs):
             net.train()
@@ -102,23 +101,21 @@ for patient in patients:
             opt.step()
             out=out*mask_heart
             out =torch.cat((1-mask_heart,out),1)
+            #stopping criteria
             change = (nll[-2]-nll[-1])
             if (epoch > args.min_epochs  and  abs(change) < args.tol):    
                 break
         
+        #save results
         if args.save_nets == True:
             save_checkpoint(net, os.path.join(savefolder, "nets"))
         results[patient]["NLL"]=nll[-1]
         pred = np.argmax(out[0,...].cpu().detach().numpy(),0)
         pred = order_dice(pred, gt)
-        
         for cl,i in zip(config["classes"],range(1,5)):
             results[patient]["dice_"+cl] = dicecoeff((pred==i)*1, (gt==i)*1)
-        
         np.save(os.path.join(savefolder,"predictions", patient), pred)
-        
         plot_result(X[0,...].cpu(), pred, gt, os.path.join(savefolder, "plots"), patient)
-        
         
 print(f"Results saved in {savefolder}")
     
