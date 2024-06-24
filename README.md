@@ -82,7 +82,7 @@ or
 python EM_SVGMM.py --mu_data T/F --tol XXX --max_iter XXX
 
 ```
-- `--mu_data` specifies if $\boldsymbol{\mu}_{\text{data}}$ should be used as initalization for the parameter $\boldsymbol{\mu}$ (`default=False`).
+- `--mu_data` specifies if $\boldsymbol{\mu}_{\textit{data}}$ should be used as initalization for the parameter $\boldsymbol{\mu}$ (`default=False`).
 - `--tol` defines the stopping criteria. If the NLL improvement per iteration gets smaller than `tol` the algorithm is stopped (`default=0.001`).  
 - `--max_iter` defines maximal number of EM-iterations that are performed (`default=100`).
 
