@@ -143,8 +143,8 @@ plt.subplot(1,3,3)
 plt.plot(histogramm["dice"], label =["blood","muscle", "edema", "scar"])
 plt.legend(loc='best', fontsize=8)
 plt.title("Dice", fontsize = 11)
-plt.savefig(os.path.join(savefolder, "train_progress.png"), bbox_inches='tight', dpi=500)
-plt.show()
+plt.savefig(os.path.join(savefolder, "train_progress.png"), bbox_inches='tight', dpi=300)
+plt.close()
 
 logger.info(f"Training finished after {epoch} epochs. Network is saved in {savefolder}.")
 

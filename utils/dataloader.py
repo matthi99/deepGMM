@@ -9,11 +9,10 @@ import os
 import numpy as np
 import torch
 from PIL import Image
-from utils.config import Config
-
-import matplotlib.patches as mpatches 
 from scipy.ndimage import gaussian_filter
 from scipy.ndimage import map_coordinates
+
+from utils.config import Config
 
 
 class CardioDataset(torch.utils.data.Dataset):
@@ -100,10 +99,6 @@ class CardioDataset(torch.utils.data.Dataset):
             intensity_transforms.append(Brightness(**kwargs.get("brightness")))
         if kwargs.get("contrast") is not None:
             intensity_transforms.append(Contrast(**kwargs.get("contrast")))  
-        if kwargs.get("lowres") is not None:
-            intensity_transforms.append(LowResolution(**kwargs.get("lowres")))   
-        if kwargs.get("ghosting"):
-            intensity_transforms.append(RandomGhosting())       
         if kwargs.get("gamma") is not None:  
             intensity_transforms.append(GammaTransform())
         
@@ -152,7 +147,11 @@ class CardioCollatorMulticlass:
         else:
             return torch.stack(inputs) ,self._stack_masks(masks)
 
+
         
+
+
+#data augmentation
         
 class getRoi(object):
     def __init__(self, modalities, **kwargs):
@@ -177,7 +176,6 @@ class getRoi(object):
         return img, mask
         
     
-
 class Normalize(object):
     def __init__(self, **kwargs):
         self.mode = kwargs.get("mode", "mean")
@@ -229,7 +227,6 @@ class RandomFlip(object):
         return img, mask
     
     
-
 class Gaussian_noise(object):
     def __init__(self, **kwargs):
         self.sigma=kwargs.get("sigma", 0.1)
@@ -276,6 +273,7 @@ class GammaTransform(object):
                 img = - img
         return img, mask
 
+
 class Brightness(object):
     def __init__(self, **kwargs):
         self.mult_range=kwargs.get("mult_range", (0.7, 1.3))
@@ -286,6 +284,7 @@ class Brightness(object):
             multiplier = np.random.uniform(self.mult_range[0], self.mult_range[1])
             img = img * multiplier
         return img, mask
+
             
 class Contrast(object):
     def __init__(self, **kwargs):
@@ -342,14 +341,12 @@ class GaussianBlur(object):
         return img, mask
                 
 
-
 def create_zero_centered_coordinate_mesh(shape):
     tmp = tuple([np.arange(i) for i in shape])
     coords = np.array(np.meshgrid(*tmp, indexing='ij')).astype(float)
     for d in range(len(shape)):
         coords[d] -= ((np.array(shape).astype(float) - 1) / 2.)[d]
     return coords
-
 def elastic_deform_coordinates(coordinates, alpha, sigma):
     n_dim = 2
     offsets = []
@@ -361,9 +358,6 @@ def elastic_deform_coordinates(coordinates, alpha, sigma):
     offsets = np.array(offsets)
     indices = offsets + coordinates
     return indices
-
-
-
 class SpatialTransform(object):
     """We have to create a tranform that does ellastic deformations rotating and scaling
             nnunet parametrs are:

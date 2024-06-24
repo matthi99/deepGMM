@@ -10,16 +10,26 @@ import torch
 
 
 class VariantGMM(torch.nn.Module):
+    """
+    Loss function for spacially variant Gaussian mixture model (SVGMM)
+    Input:
+        -current label probalilities (predictions)
+        -images (inputs)
+        -mask for left ventricle (heart)
+    Output:
+        -value of NLL_V after M-step
+    """
     def __init__(self, **kwargs):
         super(VariantGMM, self).__init__()
         self.device= torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     def forward(self, predictions, inputs, heart):
+        #batchsize (B), number of classes(K), image dimensions (X,Y), image modalities (M)
         (B,K,X,Y)=predictions.shape
         M=inputs.shape[1]
         eps=1e-10
         likelylosses=torch.zeros(B).to(self.device)
-        
         for b in range(B):
+            #get label probabilities, and pixel intensities for left ventricle
             pred = []
             for cl in range(K):
                 pred.append(predictions[b,cl,...][heart[b,0,...]==1])
@@ -28,13 +38,14 @@ class VariantGMM(torch.nn.Module):
             for ch in range(M):
                 inp.append(inputs[b,ch,...][heart[b,0,...]==1])
             inp = torch.stack(inp,dim=0)
-            
+            #M-step: update mu and Sigma
             mu=torch.zeros((K,M)).to(self.device)
             var=torch.zeros((K,M)).to(self.device)
             for k in range(K):
                 for m in range(M):
                     mu[k,m]=torch.sum(pred[k,...]*inp[m,...])/(torch.sum(pred[k,...])+eps)
                     var[k,m]=(torch.sum(pred[k,...]*(inp[m,...]-mu[k,m])**2)/(torch.sum(pred[k,...])+eps))+eps
+            #calculate NLL_V
             temp=torch.zeros((K,M,inp.shape[1])).to(self.device)
             for k in range(K):
                 for m in range(M):
@@ -46,16 +57,26 @@ class VariantGMM(torch.nn.Module):
 
 
 class NormalGMM(torch.nn.Module):
+    """
+    Loss function for Gaussian mixture model (GMM)
+    Input:
+        -current label probalilities (predictions)
+        -images (inputs)
+        -mask for left ventricle (heart)
+    Output:
+        -value of NLL after M-step
+    """
     def __init__(self, **kwargs):
         super(NormalGMM, self).__init__()
         self.device= torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     def forward(self, predictions, inputs, heart):
+        #batchsize (B), number of classes(K), image dimensions (X,Y), image modalities (M)
         (B,K,X,Y)=predictions.shape
         M=inputs.shape[1]
         eps=1e-10
         likelylosses=torch.zeros(B).to(self.device)
-        
         for b in range(B):
+            #get label probabilities, and pixel intensities for left ventricle
             pred = []
             for cl in range(K):
                 pred.append(predictions[b,cl,...][heart[b,0,...]==1])
@@ -64,37 +85,47 @@ class NormalGMM(torch.nn.Module):
             for ch in range(M):
                 inp.append(inputs[b,ch,...][heart[b,0,...]==1])
             inp = torch.stack(inp,dim=0)
-            
-            alpha = torch.mean(pred,1)
+            #M-step: update pi, mu and Sigma
+            pi = torch.mean(pred,1)
             mu=torch.zeros((K,M)).to(self.device)
             var=torch.zeros((K,M)).to(self.device)
             for k in range(K):
                 for m in range(M):
                     mu[k,m]=torch.sum(pred[k,...]*inp[m,...])/(torch.sum(pred[k,...])+eps)
                     var[k,m]=(torch.sum(pred[k,...]*(inp[m,...]-mu[k,m])**2)/(torch.sum(pred[k,...])+eps))+eps
-
+            #calculate NLL
             temp=torch.zeros((K,M,inp.shape[1])).to(self.device)
             for k in range(K):
                 for m in range(M):
                     temp[k,m,...]=(1/(torch.sqrt(2*torch.pi*var[k,m])))*torch.exp(-((inp[m,...]-mu[k,m])**2/(2*var[k,m])))
             temp =  torch.prod(temp,1)
-            temp = alpha[:,None]*temp
-            
+            temp = pi[:,None]*temp
             likelylosses[b]=-torch.mean(torch.log(torch.sum(temp,axis=0)+eps))
-            #print(alpha)
         return torch.mean(likelylosses)
 
 
 
 
 class Mu_data(torch.nn.Module):
+    """
+    Regularization loss: 
+    Input:
+        -current label probalilities (predictions)
+        -images (inputs)
+        -mask for left ventricle (heart)
+        -mu_data obtained from groundtruth of 10 random samples (mu_data)
+    Output:
+        -2-nom^2 of (mu - mu_data)
+    """
     def __init__(self, **kwargs):
         super(Mu_data, self).__init__()
     def forward(self, predictions, inputs, heart, mu_data):
+        #batchsize (B), number of classes(K), image dimensions (X,Y), image modalities (M)
         (B,K,X,Y)=predictions.shape
         M=inputs.shape[1]
         eps=1e-10
         mu_mean=torch.zeros_like(mu_data)
+        #calculate mean mu of current predictions over batchsize
         for b in range(B):
             pred = []
             for cl in range(K):
@@ -108,37 +139,9 @@ class Mu_data(torch.nn.Module):
             for k in range(K):
                 for m in range(M):
                     mu[k,m]=torch.sum(pred[k,...]*inp[m,...])/(torch.sum(pred[k,...])+eps)
-
             mu_mean+=mu    
         mu_mean = mu_mean/B
         return torch.sum((mu_data-mu_mean)**2)
-
-
-
-class Probs(torch.nn.Module):
-    def __init__(self, **kwargs):
-        super(Probs, self).__init__()
-    def forward(self, predictions, heart):    
-        (B,K,X,Y)=predictions.shape
-        l_blood=predictions[:,1,...][heart[:,0,...]==1]
-        l_muscle=predictions[:,2,...][heart[:,0,...]==1]
-        l_edema=predictions[:,3,...][heart[:,0,...]==1]
-        l_scar=predictions[:,4,...][heart[:,0,...]==1]
-        pred=torch.stack((l_blood, l_muscle, l_edema, l_scar))
-        
-        N=len(l_blood)
-        probs = (torch.sum(pred,axis=1)/N)
-        
-        # a=probs[0]
-        # probs=probs[1:]*(1/(1-a))
-        #print(probs.sum())
-        device= torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        
-        #probs_gt=torch.tensor([0.3839563844238861, 0.4023091477825316,  0.098236304180275, 0.11549816361330738]).to(device)
-        probs_gt = (torch.ones(4)/4).to(device)
-        #print(probs_gt)
-        probs_loss = torch.mean((probs-probs_gt)**2)
-        return probs_loss
     
 
 
@@ -206,8 +209,6 @@ def get_loss(crit="NormalGMM", **kwargs):
         return DiceLoss()
     elif crit == "mu_data":
         return Mu_data()
-    elif crit == "probs":
-        return Probs()
     elif crit == "NormalGMM":
         return NormalGMM()
     elif crit == "VariantGMM":

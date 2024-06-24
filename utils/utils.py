@@ -7,10 +7,7 @@ Created on Wed Mar 13 09:18:54 2024
 
 
 import numpy as np
-#import torch
 from sklearn.mixture import GaussianMixture as GMM
-#from utils.architectures import get_network
-#import yaml
 import os
 import torch
 import logging
@@ -24,6 +21,13 @@ from utils.unet import UNet2D
 
 
 class SVGMM():
+    """
+    Spatially variant Gaussian mixture model (SVGMM). 
+    This class allows to estimate the parameters of a spatially variant Gaussian mixture
+    distribution with the help of EM-algorithm.
+    Initialization is build upon GaussianMixture class of the sklearn package
+    
+    """
     def __init__(self, 
                  n_components = 4, 
                  tol=0.001, 
@@ -109,9 +113,11 @@ class SVGMM():
         self.neg_log_likely = neg_log_likely
         
 
+
+#helper fuctions 
+
 def normalize(img):
     return (img - np.mean(img)) / np.std(img)
-
 
 def prepare_data(path_to_data):
     data= np.load(path_to_data, allow_pickle=True).item()
@@ -126,8 +132,8 @@ def prepare_data(path_to_data):
     X=np.stack((LGE, T2, C0), axis=0)
     return X, gt, mask_heart
 
-
 def NLL(X, mu, var, pi):
+    """Calculate NLL of GMM """
     K,M = mu.shape
     temp=np.zeros((K,M,X.shape[0]))
     for k in range(K):
@@ -138,8 +144,8 @@ def NLL(X, mu, var, pi):
     nll = -np.mean(np.log(np.sum(temp,axis=0)))
     return nll
     
-
 def NLL_V(X, mu, var, weights):
+    """Calculate NLL of SVGMM (NLL_V)"""
     K,M = mu.shape
     temp=np.zeros((K,M,X.shape[0]))
     for k in range(K):
@@ -150,7 +156,6 @@ def NLL_V(X, mu, var, weights):
     nll = -np.mean(np.log(np.sum(temp,axis=0)))
     return nll
 
-
 def load_2dnet(path, device):
     params= yaml.load(open(path + "/config.json", 'r'), Loader=yaml.SafeLoader)['network']
     weights = torch.load(path + "/weights.pth",  map_location=torch.device(device))
@@ -158,8 +163,6 @@ def load_2dnet(path, device):
     net2d.load_state_dict(weights)
     net2d.eval()
     return net2d
-
-
 
 def dicecoeff(prediction, target):
     intersection = np.sum(prediction * target)
@@ -170,8 +173,11 @@ def dicecoeff(prediction, target):
         dice =(2 * intersection) / total 
         return dice
 
-
 def order_dice(pred, gt):
+    """
+    Rearrange the channels of the prediction such that the Dice coefficient with the ground truth 
+    segmentation gets maximized.
+    """
     ordered= np.zeros_like(pred)
     #bloodpool
     pred_gt = (gt==1)*1
@@ -224,12 +230,10 @@ def order_dice(pred, gt):
         ordered[(pred!=0)]=3
     return ordered
         
-
 def save_checkpoint(net, checkpoint_dir, name="weights"):
     checkpoint_path = os.path.join(checkpoint_dir, f"{name}.pth")
     torch.save(net.state_dict(), checkpoint_path)
     
-                
 def get_logger(name, level=logging.INFO, formatter = '%(asctime)s [%(threadName)s] %(levelname)s %(name)s - %(message)s'):
     logger = logging.getLogger(name)
     if not logger.hasHandlers():
@@ -241,7 +245,6 @@ def get_logger(name, level=logging.INFO, formatter = '%(asctime)s [%(threadName)
         logger.addHandler(stream_handler)
         logger.handler_set = True
     return logger
-
 
 def plot_result(X, pred, gt, savepath, file):
     cmap = cm.get_cmap("jet").copy()
@@ -261,14 +264,11 @@ def plot_result(X, pred, gt, savepath, file):
     plt.imshow(X[0,...], cmap = "gray")
     plt.axis("off")
     plt.title("LGE",fontsize = 11)
-    
-    
     plt.subplot(1,5,4)
     pred_masked = np.ma.masked_where(pred ==0, pred)
     plt.imshow(pred_masked, interpolation="none", vmin=0, vmax=4, cmap = cmap)
     plt.axis("off")
     plt.title("Prediction",fontsize = 11)
-    
     plt.subplot(1,5,5)
     masked_gt = np.ma.masked_where(gt ==0, gt)
     im=plt.imshow(masked_gt, interpolation="none", vmin=0, vmax=4, cmap = cmap)

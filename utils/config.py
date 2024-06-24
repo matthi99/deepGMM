@@ -5,11 +5,11 @@ Created on Mon Dec 19 11:43:42 2022
 @author: A0067501
 """
 
-import yaml
-import numpy as np
-
 
 class Config:
+    """
+    defines dataset split and training setup
+    """
     all_patients = [i for i in range(101,126)]
     val_patients = [109,114,117,120,122]
     train_patients = []
@@ -49,16 +49,6 @@ class Config:
             },
     }  
     
-    val_data_setup_heart = {
-        "normalize": {
-            "mode": "mean"
-            },
-        "ROI": {
-            "width": 160,
-            "height": 160,
-            "translation": 0
-            },
-    }  
 
 
 
