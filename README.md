@@ -51,7 +51,7 @@ To apply the proposed methods deepG and deepSVG to the multi-sequence MR images 
 python deepG.py --type "TYPE" --lam XXX --tol XXX --max_epochs XXX
 ``` 
 - `--type` specifies which Gaussian mixture model (GMM) should be used. You can decide between the classical GMM ("deepG") and the spacially variant GMM ("deepSVG"). Default setting is "deepG". 
-- `--lam` specifies the regularization parameter (`default=0`) for the regularizing function $r(\mathbf{\mu})$ described in the paper. 
+- `--lam` specifies the regularization parameter (`default=0`) for the regularizing function $r(\boldsymbol{\mu})$ described in the paper. 
 - `--tol` defines the stopping criteria. If the negative log-likelihood (NLL) change per iteration gets smaller than `tol` the algorithm is stopped. (`default=0.001`).  
 - `--max_epochs` defines for how many epochs the networks should be trained maximally (`default=200`).
 
