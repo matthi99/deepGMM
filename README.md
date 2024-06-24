@@ -65,7 +65,7 @@ python deepG_train.py --type "TYPE" --lam XXX --tol XXX --max_epochs XXX
 ``` 
 The network will be trained on images of 20 patients following the same data split as in the paper. After training the performance on a test dataset of 5 patients can be obtained by running
 ```
-python deepG_pred.py --type "TYPE" --lam XXX --tol XXX --max_epochs XXX
+python deepG_pred.py --type "TYPE" --lam XXX
 ``` 
 Segmentation masks and results compared to the ground truth again will be saved in the `RESULTS_FOLDER`.
 
