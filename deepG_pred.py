@@ -13,14 +13,13 @@ import torch
 import numpy as np
 import json
 
-parser = argparse.ArgumentParser(description='Define hyperparameters for training.')
-
-parser.add_argument('--fold', type=int, default=0)
+parser = argparse.ArgumentParser(description='Define hyperparameters for prediction.')
 parser.add_argument('--type',type = str, help = "Type of Gaussian mixture model (deepG, deepSVG) ",  default = "deepG")
 parser.add_argument('--lam',type = float, help = "Regularization parameter",  default = 1)
 parser.add_argument('--patients', nargs='+', type=int, default= [i for i in range(101,126)])
 args = parser.parse_args()
 
+#folder, patients, device, results
 folder = f"RESULTS_FOLDER/{args.type}/multiple_images/lam={args.lam}/"
 
 patient_nrs = args.patients
@@ -31,7 +30,6 @@ for patient in patients:
 files= sum(files, [])
 
 device= torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
 results= {}
 classes= ["blood", "muscle", "edema", "scar"]
 
@@ -43,6 +41,7 @@ elif args.type == "deepSVG":
 try:
     net = load_2dnet(folder, device)
     for file in files:
+        #do segmentation
         patient = file.split("/")[-1][0:-4]
         results[patient]={}
         X, gt, mask_heart = prepare_data(file)
@@ -51,19 +50,17 @@ try:
         pred= net(in_nn)[0]
         nll = NLL(pred, in_nn, mask_nn).item()
         results[patient]["NLL"]=nll
-            
         pred = np.argmax(pred[0,...].cpu().detach().numpy(),0)+1
         pred[mask_heart==0]=0
         if args.lam ==0:
             pred = order_dice(pred, gt)
-            
         for cl,i in zip(classes,range(1,5)):
             results[patient]["dice_"+cl] = dicecoeff((pred==i)*1, (gt==i)*1)
-            
+        #save predictions and plots    
         np.save(os.path.join(folder,"predictions", patient), pred)
-        
         plot_result(X, pred, gt, os.path.join(folder, "plots"), patient)
-            
+    
+    #save results    
     with open(os.path.join(folder,'results.txt'), 'w') as f:
         json.dump(results, f, indent=4, sort_keys=False)
             
@@ -72,4 +69,3 @@ try:
     
 except:
     print("You first have to train a network for this parameters!")
-
