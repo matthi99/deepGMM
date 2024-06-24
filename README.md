@@ -11,7 +11,7 @@ Schwab, M., Mayr, A., & Haltmeier, M. (2024). Deep Gaussian mixture model for un
 
 1. Clone the git repository. 
 ```
-git clone https://git.uibk.ac.at/c7021123/deepGMM.git
+git clone https://github.com/matthi99/deepGMM.git
 ``` 
 
 2. Intall and activate the virtual environment.
