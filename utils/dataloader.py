@@ -6,18 +6,15 @@ Created on Mon Dec 19 11:20:16 2022
 """
 
 import os
-
 import numpy as np
 import torch
 from PIL import Image
 from utils.config import Config
 
-import torchio as tio
-#from scipy import stats
 import matplotlib.patches as mpatches 
 from scipy.ndimage import gaussian_filter
 from scipy.ndimage import map_coordinates
-from skimage.transform import resize
+
 
 class CardioDataset(torch.utils.data.Dataset):
     """
@@ -344,56 +341,6 @@ class GaussianBlur(object):
                 img=gaussian_filter(img, sigma, order=0)
         return img, mask
                 
-class LowResolution(object):
-    def __init__(self, **kwargs):
-        self.scale_factor = kwargs.get("scale_factor", (0.5, 1))
-        self.p_per_sample = kwargs.get("p_per_sample", 0.15)
-    
-    def __call__(self, img, mask, center):
-        if np.random.uniform() < self.p_per_sample:
-            scale=np.random.uniform(self.scale_factor[0], self.scale_factor[1])
-            shp=img.shape
-            target_shape =np.array(img.shape)
-            target_shape[-1] = np.round(shp[-1] * scale).astype(int)
-            target_shape[-2] = np.round(shp[-2] * scale).astype(int)
-            downsampled = resize(img.astype(float), target_shape, order=0, mode='edge',
-                         anti_aliasing=False)
-            
-                
-            img = resize(downsampled, shp, order=3, mode='edge',
-                                anti_aliasing=False)
-        return img, mask
-        
-        
-class RandomMotion(object):
-    def __init__(self, degrees=5,translation=5, num_transorms=2, p_per_sample=0.1):
-        self.degrees=degrees
-        self.translation=translation
-        self.num_transforms=num_transorms
-        self.p_per_sample = p_per_sample 
-    def __call__(self, img, mask, center):
-        if np.random.uniform() < self.p_per_sample:
-            subject = tio.Subject(image = tio.ScalarImage(tensor =np.expand_dims(img,0)),
-                                  mask = tio.LabelMap(tensor = mask))
-            transform=tio.RandomMotion(degrees=self.degrees,translation=self.translation,num_transforms=self.num_transforms)
-            deformed=transform(subject)
-            return np.array(deformed.image)[0,...], np.array(deformed.mask)
-        else:
-            return img, mask
-            
-class RandomGhosting(object):
-    def __init__(self, num_ghosts=(4,10), axes=(1,2), intensity=(0.5, 1),restore = 0.02, p_per_sample=1):
-        self.num_ghosts=num_ghosts
-        self.axes=axes
-        self.intensity=intensity
-        self.restore=restore
-        self.p_per_sample = p_per_sample 
-    def __call__(self, img, mask, center):
-        if np.random.uniform() < self.p_per_sample:
-            transform=tio.RandomGhosting(num_ghosts=self.num_ghosts, axes=self.axes, intensity=self.intensity,restore=self.restore)
-            img=transform(np.expand_dims(img,0))[0,...]
-        return img, mask
-        
 
 
 def create_zero_centered_coordinate_mesh(shape):
@@ -535,85 +482,3 @@ class SpatialTransform(object):
     
     
     
-if __name__ == '__main__':
-    import matplotlib.pyplot as plt
-    from torch.utils.data import DataLoader
-    # p = 'images/dataset/'
-    classes=["bloodpool", "healthy muscle", "edema", "scar", "mvo"]
-
-    # if not os.path.exists(p):
-    #     os.mkdir(p)
-    
-    
-    setup=Config.train_data_setup
-    
-    cd = CardioDataset( **setup)
-
-
-    collator = CardioCollatorMulticlass(**{'return_all': True})
-    dataset = DataLoader(cd,  batch_size=1, collate_fn=collator, shuffle=False)
-    
-    l=1
-    k=0
-    for img ,mask, example in dataset:
-        
-        im_LGE=img[0,0, ...].cpu().detach().numpy()
-        im_T2=img[0,1, ...].cpu().detach().numpy()
-        im_C0=img[0,2, ...].cpu().detach().numpy()
-        blood=mask["blood"][0,0, ...].cpu().detach().numpy()
-        muscle=(mask["muscle"][0,0, ...]).cpu().detach().numpy()
-        edema=mask["edema"][0,0, ...].cpu().detach().numpy()
-        scar=mask["scar"][0,0, ...].cpu().detach().numpy()
-            
-        seg=blood+2*muscle+3*edema+4*scar
-        seg=seg-1
-        seg = np.ma.masked_where(seg == -1, seg)
-                
-                
-        plt.figure()
-        plt.subplot(2,2,1)
-        plt.imshow(im_LGE, cmap='gray')
-        plt.gca().set_title("LGE"+example[0])
-        plt.axis('off')
-        plt.subplot(2,2,2)
-        plt.imshow(im_T2, cmap='gray')
-        plt.gca().set_title("T2")
-        plt.axis('off')
-        plt.subplot(2,2,3)
-        plt.imshow(im_C0, cmap='gray')
-        plt.gca().set_title("C0")
-        plt.axis('off')
-        plt.subplot(2,2,4)
-        plt.imshow(im_LGE, cmap='gray')
-        plt.gca().set_title("Lables")
-        plt.axis('off')
-        mat=plt.imshow(seg, 'jet', alpha=0.5, interpolation="none", vmin = 0, vmax = 3)
-        plt.axis('off')
-        plt.gca().set_title('Labels')
-                
-        values = np.array([0,1,2,3])
-        colors = [ mat.cmap(mat.norm(value)) for value in values]
-        patches = [ mpatches.Patch(color=colors[i], label="{l}".format(l=classes[i]) ) for i in range(len(values)) ]
-        plt.legend(handles=patches, loc='lower right',  bbox_to_anchor=(0.85, -0.4, 0.2, 0.2) )
-                
-            #plt.savefig("C:/Users/A0067501/Desktop/Project3D/create_dataset/check_labels/val/"+example[0][0:-4]+"_"+str(i)+".png", bbox_inches='tight', dpi=500)
-        plt.show()
-        
-            # if np.max(mask[cls].cpu().detach().numpy())>1:
-            #     print('Problem')
-            #     test=mask[cls].cpu().detach().numpy()[0,0,...]
-            #     for i in range(len(test)):
-            #         plt.figure()
-            #         plt.imshow(test[i])
-            #         plt.colorbar()
-            #         plt.show()
-                    
-                
-            
-            
-            #plt.savefig(p+cls +'/image-'+str(l)+'.png', bbox_inches='tight')
-            
-            #plt.close()
-        l=l+1
-            
-

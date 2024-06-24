@@ -18,7 +18,7 @@ parser = argparse.ArgumentParser(description='Define hyperparameters for trainin
 parser.add_argument('--fold', type=int, default=0)
 parser.add_argument('--type',type = str, help = "Type of Gaussian mixture model (deepG, deepSVG) ",  default = "deepG")
 parser.add_argument('--lam',type = float, help = "Regularization parameter",  default = 1)
-parser.add_argument('--patients', nargs='+', type=float, default= [i for i in range(101,126)])
+parser.add_argument('--patients', nargs='+', type=int, default= [i for i in range(101,126)])
 args = parser.parse_args()
 
 folder = f"RESULTS_FOLDER/{args.type}/multiple_images/lam={args.lam}/"

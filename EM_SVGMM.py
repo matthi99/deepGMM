@@ -16,8 +16,8 @@ from utils.utils import prepare_data, NLL_V, order_dice, dicecoeff, SVGMM, plot_
 parser = argparse.ArgumentParser(description='Define hyperparameters for predictions.')
 parser.add_argument('--mu_data', type=bool, default=False)
 parser.add_argument('--tol', type=float, default=0.001)
-parser.add_argument('--max_iter', type=float, default=100)
-parser.add_argument('--patients', nargs='+', type=float, default= [i for i in range(101,126)])
+parser.add_argument('--max_iter', type=int, default=100)
+parser.add_argument('--patients', nargs='+', type=int, default= [i for i in range(101,126)])
 parser.add_argument('--random_state', type = int, default = 33)
 args = parser.parse_args()
 

@@ -23,7 +23,7 @@ parser.add_argument('--min_epochs', type=int, default=10)
 parser.add_argument('--type',type = str, help = "Type of Gaussian mixture model (deepG, deepSVG) ",  default = "deepSVG")
 parser.add_argument('--lam',type = float, help = "Regularization parameter",  default = 0)
 parser.add_argument('--tol',type = float, help = "Tolerance for stopping criteria",  default = 0.001)
-parser.add_argument('--patients', nargs='+', type=float, help = "Patientnumbers of patients",default= [i for i in range(101,126)])
+parser.add_argument('--patients', nargs='+', type=int, help = "Patientnumbers of patients",default= [i for i in range(101,126)])
 parser.add_argument('--save_nets',type = bool, help = "Should the neural networks get saved? Could need a lot of memory",  default = False)
 args = parser.parse_args()
 
